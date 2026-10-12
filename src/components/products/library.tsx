@@ -24,7 +24,8 @@ import { familyStats } from "./library-utils";
 
 type View = "grid" | "table";
 type GroupBy = "none" | "brand" | "category" | "marketplace";
-type StatusFilter = "all" | "unavailable" | "attention" | "favorites" | "discounted";
+type StatusFilter = "all" | "unavailable" | "attention" | "favorites" | "discounted" | "paused";
+const STATUS_FILTERS: StatusFilter[] = ["all", "unavailable", "attention", "favorites", "discounted", "paused"];
 
 interface ViewState {
   view: View;
@@ -60,12 +61,16 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY);
+      // A deep link (?status=paused) wins over the remembered view.
+      const linked = params.get("status") as StatusFilter | null;
       // Storage is client-only; restoring after mount keeps hydration identical to the server render.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setState((s) => ({ ...s, ...JSON.parse(saved), q: "" }));
+      if (saved || linked) setState((s) => ({ ...s, ...(saved ? JSON.parse(saved) : {}), q: "", ...(linked && STATUS_FILTERS.includes(linked) ? { status: linked } : {}) }));
     } catch {
       /* ignore */
     }
+    // Restore once on mount; later URL changes are handled by navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     try {
@@ -90,6 +95,7 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
       if (state.status === "favorites" && !f.favorite) return false;
       if (state.status === "unavailable" && !f.variants.some((v) => v.availability === "out_of_stock")) return false;
       if (state.status === "attention" && !f.variants.some((v) => v.freshness === "failed" || v.freshness === "provider_stale" || !v.quantities.length || v.availability === "out_of_stock")) return false;
+      if (state.status === "paused" && !f.variants.some((v) => v.freshness === "paused")) return false;
       if (state.status === "discounted" && !f.variants.some((v) => v.listPriceMinor && v.priceMinor && v.priceMinor < v.listPriceMinor)) return false;
       return true;
     });
@@ -242,6 +248,7 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
             { value: "discounted", label: "Discounted" },
             { value: "unavailable", label: "Unavailable" },
             { value: "attention", label: "Needs attention" },
+            { value: "paused", label: "Paused" },
           ]}
         />
         <Menu

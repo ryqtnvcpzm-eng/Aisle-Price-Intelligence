@@ -19,6 +19,8 @@ export interface Dashboard {
     products: number;
     variants: number;
     monitored: number;
+    /** Tracked variants whose monitoring is paused (no schedule). */
+    paused: number;
     competitorBrands: number;
     changes24h: number;
     activeRules: number;
@@ -117,6 +119,7 @@ export async function getDashboard(workspaceId: string, marketplace: string | nu
       products: new Set(rows.map((r) => r.familyId)).size,
       variants: rows.length,
       monitored: rows.filter((r) => r.checkIntervalMinutes !== null).length,
+      paused: rows.filter((r) => r.checkIntervalMinutes === null).length,
       competitorBrands: new Set(rows.filter((r) => !r.isReferenceBrand && r.brandName).map((r) => r.brandName)).size,
       changes24h,
       activeRules: Number(rulesCount?.n ?? 0),

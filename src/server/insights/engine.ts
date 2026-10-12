@@ -6,6 +6,7 @@ import { defaultBasisFor, isNormalizationBasis, unitPriceMinor } from "@/lib/qua
 import { loadSeries } from "../analytics/series";
 import { listGroups, listVariantRows, type VariantRow } from "../catalog/queries";
 import { getGroupDetail } from "../comparison/service";
+import { detectPromoCycle, detectTrend, detectUnusualMove } from "../ml";
 
 export type InsightKind =
   | "competitor_cut"
@@ -16,7 +17,10 @@ export type InsightKind =
   | "volatility_up"
   | "unit_economics"
   | "competitor_unavailable"
-  | "discount_ended";
+  | "discount_ended"
+  | "unusual_move"
+  | "price_trend"
+  | "promo_cycle";
 
 export interface Insight {
   id: string;
@@ -143,6 +147,72 @@ export async function computeInsights(workspaceId: string, opts: { significantPc
         period: "Last 3 days",
         evidence: [`Typical level = most common observed price over the preceding 14 days`],
         at: new Date(ended.t).toISOString(),
+        coverage: { observations: stats30.observations, share: stats30.coverage },
+        ...base(v),
+      });
+    }
+
+    // 4b. Unusual move (robust z-score vs. this listing's own change history).
+    const unusual = detectUnusualMove(pts, { now });
+    if (unusual) {
+      const typical = `typical move ±${formatPct(unusual.typicalAbsRatio)} across its previous ${unusual.baselineChanges} changes`;
+      const existing = out.find((i) => i.id === `move:${v.variantId}`);
+      if (existing) {
+        existing.severity = Math.min(98, existing.severity + 10);
+        existing.metrics.unusualZ = unusual.z;
+        existing.evidence.push(`Unusually large for this listing: robust z = ${unusual.z} (${typical}).`);
+      } else {
+        out.push({
+          id: `unusual:${v.variantId}:${unusual.at}`,
+          kind: "unusual_move",
+          severity: Math.min(90, 55 + Math.abs(unusual.z) * 3),
+          tone: unusual.ratio < 0 ? (isCompetitor ? "warning" : "neutral") : "neutral",
+          headline: `${nameOf(v)} moved ${unusual.ratio < 0 ? "down" : "up"} ${formatPct(Math.abs(unusual.ratio))} — unusually large for this listing`,
+          explanation: `${fmt(v, unusual.from)} → ${fmt(v, unusual.to)}. Its ${typical}, so this change sits ${Math.abs(unusual.z)} robust deviations from normal.`,
+          metrics: { from: unusual.from, to: unusual.to, ratio: unusual.ratio, z: unusual.z },
+          period: "Last 3 days",
+          evidence: [`Method: robust z-score (median / MAD of log price changes), learned per listing`, `Observed ${new Date(unusual.at).toISOString()}`],
+          at: new Date(unusual.at).toISOString(),
+          coverage: { observations: stats30.observations, share: stats30.coverage },
+          ...base(v),
+        });
+      }
+    }
+
+    // 4c. Sustained trend (least-squares fit over daily samples; several distinct moves required).
+    const trend = detectTrend(pts, { now, maxGap: Math.max(gap, 48 * HOUR) });
+    if (trend) {
+      out.push({
+        id: `trend:${v.variantId}`,
+        kind: "price_trend",
+        severity: Math.min(70, 38 + Math.abs(trend.weeklyRatio) * 600),
+        tone: "neutral",
+        headline: `${nameOf(v)} has trended ${trend.weeklyRatio < 0 ? "down" : "up"} about ${formatPct(Math.abs(trend.weeklyRatio))} a week`,
+        explanation: `A straight-line fit over ${trend.days} days of observed prices (${trend.changes} changes) runs from about ${fmt(v, trend.fittedStart)} to ${fmt(v, trend.fittedEnd)} and explains ${Math.round(trend.r2 * 100)}% of the variation.`,
+        metrics: { weeklyRatio: trend.weeklyRatio, r2: trend.r2, changes: trend.changes },
+        period: `Last ${trend.days} days`,
+        evidence: [`Method: least-squares regression on daily step-function samples (R² ${trend.r2})`, `${trend.samples} of ${trend.days + 1} days had a known price`],
+        at: new Date(now).toISOString(),
+        coverage: { observations: stats30.observations, share: stats30.coverage },
+        ...base(v),
+      });
+    }
+
+    // 4d. Recurring promotions (autocorrelation of a discount indicator).
+    const cycle = detectPromoCycle(pts, { now, maxGap: Math.max(gap, 48 * HOUR) });
+    if (cycle) {
+      const next = new Date(cycle.nextEstimate).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+      out.push({
+        id: `cycle:${v.variantId}`,
+        kind: "promo_cycle",
+        severity: isCompetitor ? 48 : 38,
+        tone: "neutral",
+        headline: `Discounts on ${nameOf(v)} recur roughly every ${cycle.periodDays} days`,
+        explanation: `${cycle.episodes} discount episodes in the last 60 days. If the pattern continues, the next would fall around ${next} — a pattern in past data, not a forecast.`,
+        metrics: { periodDays: cycle.periodDays, acf: cycle.acf, episodes: cycle.episodes },
+        period: "Last 60 days",
+        evidence: [`Method: autocorrelation of “below 92% of trailing 14-day median” (r = ${cycle.acf} at ${cycle.periodDays} days)`, `Last episode began ${new Date(cycle.lastStart).toISOString().slice(0, 10)}`],
+        at: new Date(cycle.lastStart).toISOString(),
         coverage: { observations: stats30.observations, share: stats30.coverage },
         ...base(v),
       });

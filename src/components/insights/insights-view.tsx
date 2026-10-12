@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { AlertTriangle, ArrowRight, BarChart3, ChevronDown, CircleSlash, Layers, Sparkles, TrendingDown, TrendingUp, Waves } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, ChevronDown, CircleSlash, Layers, Repeat, Sparkles, TrendingDown, TrendingUp, Waves, Zap } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
@@ -16,16 +16,17 @@ import { EmptyState } from "../ui/empty-state";
 import { Segmented } from "../ui/segmented";
 import { SimulatedBadge } from "../ui/status";
 
-const ICONS: Record<string, typeof Sparkles> = { competitor_cut: TrendingDown, competitor_raise: TrendingUp, observed_low: TrendingDown, brand_premium: Layers, reference_lost_lead: BarChart3, volatility_up: Waves, unit_economics: Sparkles, competitor_unavailable: CircleSlash, discount_ended: AlertTriangle };
-const KIND_LABEL: Record<string, string> = { competitor_cut: "Competitor move", competitor_raise: "Competitor move", observed_low: "Observed low", brand_premium: "Positioning", reference_lost_lead: "Leadership", volatility_up: "Volatility", unit_economics: "Unit economics", competitor_unavailable: "Availability", discount_ended: "Promotion" };
+const ICONS: Record<string, typeof Sparkles> = { competitor_cut: TrendingDown, competitor_raise: TrendingUp, observed_low: TrendingDown, brand_premium: Layers, reference_lost_lead: BarChart3, volatility_up: Waves, unit_economics: Sparkles, competitor_unavailable: CircleSlash, discount_ended: AlertTriangle, unusual_move: Zap, price_trend: TrendingUp, promo_cycle: Repeat };
+const KIND_LABEL: Record<string, string> = { competitor_cut: "Competitor move", competitor_raise: "Competitor move", observed_low: "Observed low", brand_premium: "Positioning", reference_lost_lead: "Leadership", volatility_up: "Volatility", unit_economics: "Unit economics", competitor_unavailable: "Availability", discount_ended: "Promotion", unusual_move: "Unusual move", price_trend: "Trend", promo_cycle: "Promotion cycle" };
+const PATTERN_KINDS = ["unusual_move", "price_trend", "promo_cycle"];
 
 export function InsightsView({ insights }: { insights: Insight[] }) {
-  const [filter, setFilter] = useState<"all" | "competitors" | "positioning" | "availability">("all");
+  const [filter, setFilter] = useState<"all" | "competitors" | "positioning" | "patterns" | "availability">("all");
   const [open, setOpen] = useState<string | null>(insights[0]?.id ?? null);
   const [summary, setSummary] = useState<{ text: string | null; model: string | null; source?: "ai" | "built-in"; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const shown = insights.filter((i) => filter === "all" || (filter === "competitors" && ["competitor_cut", "competitor_raise", "volatility_up", "discount_ended"].includes(i.kind)) || (filter === "positioning" && ["brand_premium", "reference_lost_lead", "unit_economics", "observed_low"].includes(i.kind)) || (filter === "availability" && i.kind === "competitor_unavailable"));
+  const shown = insights.filter((i) => filter === "all" || (filter === "competitors" && ["competitor_cut", "competitor_raise", "volatility_up", "discount_ended"].includes(i.kind)) || (filter === "positioning" && ["brand_premium", "reference_lost_lead", "unit_economics", "observed_low"].includes(i.kind)) || (filter === "patterns" && PATTERN_KINDS.includes(i.kind)) || (filter === "availability" && i.kind === "competitor_unavailable"));
 
   async function explain() {
     setLoading(true);
@@ -44,7 +45,7 @@ export function InsightsView({ insights }: { insights: Insight[] }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
-        <Segmented ariaLabel="Filter insights" size="sm" value={filter} onChange={setFilter} options={[{ value: "all", label: `All (${insights.length})` }, { value: "competitors", label: "Competitors" }, { value: "positioning", label: "Positioning" }, { value: "availability", label: "Availability" }]} />
+        <Segmented ariaLabel="Filter insights" size="sm" value={filter} onChange={setFilter} options={[{ value: "all", label: `All (${insights.length})` }, { value: "competitors", label: "Competitors" }, { value: "positioning", label: "Positioning" }, { value: "patterns", label: "Patterns" }, { value: "availability", label: "Availability" }]} />
         <Button className="ml-auto" size="sm" variant="tinted" loading={loading} onClick={explain}>
           <Sparkles className="size-3.5" /> Brief me
         </Button>

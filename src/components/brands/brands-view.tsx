@@ -36,6 +36,8 @@ interface BrandData {
   inStockShare: number;
   avgChange7d: number | null;
   avgChange30d: number | null;
+  movement30d: number | null;
+  segment: { label: string; cluster: number } | null;
   products: { id: string; title: string; imageUrl: string | null; variants: number; marketplace: string }[];
   changes: { variantId: string; familyId: string; label: string; title: string; from: number; to: number; currency: string }[];
 }
@@ -99,6 +101,8 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
         <div className="mt-2 grid grid-cols-[160px_1fr_72px] gap-3 px-2 text-2xs text-ink-3"><span /><span className="flex justify-between"><span>▼ cheaper</span><span>pricier ▲</span></span><span /></div>
       </section>
 
+      <Segments stats={stats} colors={colors} onPick={setActive} />
+
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
         {brand && (
           <section className="card p-5">
@@ -107,6 +111,7 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-semibold tracking-tight">{brand.name}</h2>
                   {brand.isReference && <Badge tone="accent" size="xs">Reference</Badge>}
+                  {brand.segment && <Badge tone="neutral" size="xs">{brand.segment.label}</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs text-ink-3">{brand.categories.join(" · ") || "No category"} · {brand.marketplaces.map((m) => m).join(", ")}</p>
               </div>
@@ -172,6 +177,7 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
                   ["In stock", (b: BrandData) => formatPct(b.inStockShare)],
                   ["Avg change · 7d", (b: BrandData) => (b.avgChange7d === null ? "—" : formatPct(b.avgChange7d, { signed: true }))],
                   ["Avg change · 30d", (b: BrandData) => (b.avgChange30d === null ? "—" : formatPct(b.avgChange30d, { signed: true }))],
+                  ["Segment", (b: BrandData) => b.segment?.label ?? "—"],
                 ].map(([label, fn]) => (
                   <tr key={label as string} className="hairline-t">
                     <td className="py-2.5 text-ink-2">{label as string}</td>
@@ -186,6 +192,44 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
         </section>
       </div>
     </div>
+  );
+}
+
+/** Brands grouped by k-means over premium, discount share and price movement. Hidden until there's enough overlap to cluster. */
+function Segments({ stats, colors, onPick }: { stats: BrandData[]; colors: Map<string, string>; onPick: (name: string) => void }) {
+  const groups = [...new Map(stats.filter((s) => s.segment).map((s) => [s.segment!.cluster, s.segment!.label])).entries()].map(([cluster, label]) => ({ cluster, label, members: stats.filter((s) => s.segment?.cluster === cluster) }));
+  if (groups.length < 2) return null;
+  const med = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : null);
+  return (
+    <section className="card p-5">
+      <SectionHeader title="Positioning segments" description="Brands that price alike, found by clustering — tracked listings only" />
+      <div className={cn("mt-4 grid gap-3", groups.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+        {groups.map((g, gi) => {
+          const premium = med(g.members.map((m) => m.medianPremium ?? 0));
+          const discounted = med(g.members.map((m) => m.discountedShare ?? 0));
+          return (
+            <motion.div key={g.cluster} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: staggerDelay(gi, 0.06) }} className="rounded-[14px] bg-surface-2 p-4 shadow-[var(--ring-inset)]">
+              <div className="text-sm font-semibold tracking-tight">{g.label}</div>
+              <div className="num mt-0.5 text-2xs text-ink-3">
+                {premium !== null && `${formatPct(premium, { signed: true })} vs peers`}
+                {discounted !== null && ` · ${formatPct(discounted)} discounted`}
+              </div>
+              <ul className="mt-3 flex flex-wrap gap-1.5">
+                {g.members.map((m) => (
+                  <li key={m.name}>
+                    <button onClick={() => onPick(m.name)} className="flex h-7 items-center gap-1.5 rounded-full bg-surface px-2.5 text-xs font-medium shadow-[var(--shadow-xs),var(--ring-inset)] transition-[transform,box-shadow] hover:shadow-[var(--shadow-sm),var(--ring-inset)] active:scale-[0.97]">
+                      <span className="size-2 rounded-full" style={{ background: colors.get(m.name) ?? OTHER_VAR }} />
+                      {m.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-2xs text-ink-3">Method: k-means (seeded, k ≤ 3) on standardized median premium (weighted ×2), share of listings discounted and mean 30-day price movement. Brands without a comparison overlap aren’t clustered.</p>
+    </section>
   );
 }
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { sql } from "drizzle-orm";
+import { and, eq, min, ne, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { providerQuotas, providerRequests } from "../db/schema";
 import { env } from "../env";
@@ -107,6 +107,22 @@ export function getActiveProvider(): DataProvider {
 
 export function dataMode(): "demo" | "live" {
   return getActiveProvider().isSimulated ? "demo" : "live";
+}
+
+/**
+ * When did each real provider first return a successful response in this
+ * deployment? Until then its adapter is only fixture-tested, and the UI says so
+ * instead of presenting live tracking as operational.
+ */
+export async function liveVerification(): Promise<Partial<Record<ProviderId, string | null>>> {
+  const rows = await db
+    .select({ provider: providerRequests.provider, first: min(providerRequests.createdAt) })
+    .from(providerRequests)
+    .where(and(eq(providerRequests.status, "ok"), ne(providerRequests.provider, "demo")))
+    .groupBy(providerRequests.provider);
+  const out: Partial<Record<ProviderId, string | null>> = { creators: null };
+  for (const r of rows) out[r.provider as ProviderId] = r.first ? new Date(r.first).toISOString() : null;
+  return out;
 }
 
 export interface ProviderInfo {

@@ -2,39 +2,71 @@
 
 import { motion } from "motion/react";
 import { Package } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 
-/** Product thumbnail: fades in once decoded; graceful placeholder; optional shared-layout id. */
+type Status = "ssr" | "loading" | "loaded" | "error";
+
+const noopSubscribe = () => () => {};
+/** True while rendering on the server or hydrating server markup; false for client-created elements. */
+const useHydrating = () => useSyncExternalStore(noopSubscribe, () => false, () => true);
+
+/**
+ * Product thumbnail.
+ *
+ * Loading model (per `src`):
+ *  - Server-rendered images are visible immediately — visibility never waits for
+ *    JavaScript, so slow hydration can't leave decoded images invisible.
+ *  - Images created on the client (navigation, new imports) fade in once loaded.
+ *  - A ref callback checks `complete` at commit (before paint), so images that
+ *    finished before React attached `onLoad` — cache hits, or loads that beat
+ *    hydration — are settled via `decode()`, which is also correct for SVGs
+ *    without intrinsic size (naturalWidth 0).
+ *  - Failures show a placeholder; a new `src` resets state and retries.
+ *  - The <img> is keyed by `src`, so callbacks from a previous source are ignored.
+ */
 export function ProductImage({ src, alt, size = 40, className, layoutId, rounded = 10 }: { src: string | null | undefined; alt: string; size?: number | "fill"; className?: string; layoutId?: string; rounded?: number }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-  // An image can finish loading before hydration attaches onLoad — check on mount.
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img?.complete) {
-      if (img.naturalWidth > 0) setLoaded(true);
-      else setFailed(true);
-    }
-  }, [src]);
+  const hydrating = useHydrating();
+  const [state, setState] = useState<{ src: string | null | undefined; status: Status }>(() => ({ src, status: hydrating ? "ssr" : "loading" }));
+  // Reset when the source changes (adjusting state during render — no extra effect pass).
+  if (state.src !== src) setState({ src, status: "loading" });
+  const status = state.src === src ? state.status : "loading";
+
+  // Functional update: a late callback for an older source finds a different `s.src` and is ignored.
+  const settle = useCallback((forSrc: string | null | undefined, next: Status) => {
+    setState((s) => (s.src === forSrc && s.status !== next && !(s.status === "ssr" && next === "loaded") ? { src: forSrc, status: next } : s));
+  }, []);
+
+  const attach = useCallback(
+    (img: HTMLImageElement | null) => {
+      if (!img || !img.complete) return;
+      // Complete before handlers could observe it: decode() resolves for usable images, rejects for broken ones.
+      if (typeof img.decode === "function") img.decode().then(() => settle(src, "loaded"), () => settle(src, "error"));
+      else settle(src, img.naturalWidth > 0 ? "loaded" : "error");
+    },
+    [settle, src],
+  );
+
   const dims = size === "fill" ? { width: "100%", height: "100%" } : { width: size, height: size };
+  const showImage = Boolean(src) && status !== "error";
   return (
-    <motion.div layoutId={layoutId} className={cn("relative shrink-0 overflow-hidden bg-[#f4f4f6] dark:bg-[#ececef]", className)} style={{ ...dims, borderRadius: rounded }}>
-      {src && !failed ? (
+    <motion.div layoutId={layoutId} data-image-status={src ? status : "none"} className={cn("relative shrink-0 overflow-hidden bg-[#f4f4f6] dark:bg-[#ececef]", className)} style={{ ...dims, borderRadius: rounded }}>
+      {status === "loading" && <div className="skeleton absolute inset-0" aria-hidden />}
+      {showImage ? (
         <img
-          ref={imgRef}
-          src={src}
+          key={src!}
+          ref={attach}
+          src={src!}
           alt={alt}
           loading="lazy"
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
-          className={cn("h-full w-full object-contain transition-opacity duration-300 ease-out", loaded ? "opacity-100" : "opacity-0")}
+          onLoad={() => settle(src, "loaded")}
+          onError={() => settle(src, "error")}
+          className={cn("relative h-full w-full object-contain", status === "ssr" ? "opacity-100" : "transition-opacity duration-300 ease-out", status === "loaded" && "opacity-100", status === "loading" && "opacity-0")}
           referrerPolicy="no-referrer"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-ink-4" aria-label={alt}>
+        <div className="flex h-full w-full items-center justify-center text-ink-4" role="img" aria-label={alt}>
           <Package className="size-1/2 max-h-6 max-w-6" strokeWidth={1.5} />
         </div>
       )}

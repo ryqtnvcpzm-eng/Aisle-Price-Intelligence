@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, Bell, Boxes, CircleSlash, Clock, Package, RefreshCw, Sparkles, Tag, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, ArrowRight, ArrowUpRight, BarChart3, Bell, Boxes, CircleSlash, Clock, Package, RefreshCw, Repeat, Sparkles, Tag, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
@@ -44,7 +44,7 @@ interface AlertEventRow {
   isSimulated: boolean;
 }
 export interface DashboardData {
-  kpis: { products: number; variants: number; monitored: number; competitorBrands: number; changes24h: number; activeRules: number; alerts24h: number; freshness: Record<string, number>; coverage: number | null };
+  kpis: { products: number; variants: number; monitored: number; paused: number; competitorBrands: number; changes24h: number; activeRules: number; alerts24h: number; freshness: Record<string, number>; coverage: number | null };
   movers: { down: Mover[]; up: Mover[] };
   attention: { variant: VariantRow; reason: string }[];
   trend: IndexPoint[];
@@ -120,7 +120,7 @@ export function Dashboard({ data, insights, userName, renderedAt }: { data: Dash
       {/* KPI strip — one calm surface, not a sea of cards */}
       <motion.section {...appear(1)} className="card grid grid-cols-2 overflow-hidden sm:grid-cols-3 lg:grid-cols-6" aria-label="Key metrics">
         <Kpi href="/products" label="Products tracked" value={k.products} icon={Package} />
-        <Kpi href="/products" label="Variants monitored" value={k.monitored} sub={k.variants !== k.monitored ? `of ${k.variants}` : undefined} icon={Boxes} />
+        <Kpi href={k.paused ? "/products?status=paused" : "/products"} label="Variants monitored" value={k.monitored} sub={k.variants !== k.monitored ? `of ${k.variants}${k.paused ? ` · ${k.paused} paused` : ""}` : undefined} icon={Boxes} />
         <Kpi href="/brands" label="Competitor brands" value={k.competitorBrands} icon={Tag} />
         <Kpi href="/history" label="Price changes · 24h" value={k.changes24h} icon={RefreshCw} />
         <Kpi href="/alerts" label="Alerts · 24h" value={k.alerts24h} sub={`${k.activeRules} active rules`} icon={Bell} />
@@ -281,7 +281,7 @@ function MoverList({ movers, empty }: { movers: Mover[]; empty: string }) {
 }
 
 function InsightIcon({ kind, tone }: { kind: string; tone: string }) {
-  const Icon = kind === "competitor_cut" ? TrendingDown : kind === "competitor_raise" ? TrendingUp : kind === "competitor_unavailable" ? CircleSlash : kind === "reference_lost_lead" ? BarChart3 : Sparkles;
+  const Icon = kind === "competitor_cut" ? TrendingDown : kind === "competitor_raise" ? TrendingUp : kind === "competitor_unavailable" ? CircleSlash : kind === "reference_lost_lead" ? BarChart3 : kind === "unusual_move" ? Zap : kind === "promo_cycle" ? Repeat : kind === "price_trend" ? TrendingUp : Sparkles;
   return (
     <span className={cn("mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-[8px]", tone === "warning" ? "bg-warn-soft text-warn" : tone === "negative" ? "bg-bad-soft text-bad" : tone === "positive" ? "bg-good-soft text-good" : "bg-accent-soft text-accent")}>
       <Icon className="size-3.5" strokeWidth={2.2} />

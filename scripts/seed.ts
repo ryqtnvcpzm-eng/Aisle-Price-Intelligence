@@ -278,7 +278,7 @@ async function main() {
   await db.update(s.variants).set({ intervalMinutes: null }).where(eq(s.variants.id, paused.variantId));
   await db.update(s.listings).set({ checkIntervalMinutes: null, nextCheckAt: null }).where(inArray(s.listings.id, [paused.listingId]));
 
-  console.log(`✓ seeded demo workspace in ${Date.now() - started}ms — ${variantByAsin.size} variants, ${obsCount} simulated observations`);
+  console.log(`✓ seeded demo workspace in ${Date.now() - started}ms — ${variantByAsin.size} variants (${variantByAsin.size - 1} monitored hourly, 1 paused on purpose to show the paused state), ${obsCount} simulated observations`);
   console.log(`  sign in: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
 }
 

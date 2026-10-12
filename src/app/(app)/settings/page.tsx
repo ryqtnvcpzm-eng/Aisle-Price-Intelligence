@@ -4,7 +4,7 @@ import { Page } from "@/components/ui/page";
 import { env } from "@/server/env";
 import { budgetSummary } from "@/server/monitoring/budget";
 import { listRecentJobs } from "@/server/monitoring/scheduler";
-import { activeProviderId, dataMode, listProviders } from "@/server/providers";
+import { activeProviderId, dataMode, listProviders, liveVerification } from "@/server/providers";
 import { requireContext } from "@/server/workspace/context";
 
 export const metadata = { title: "Settings" };
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
         role={ctx.role}
         workspace={{ name: ctx.workspace.name, defaultMarketplace: ctx.workspace.defaultMarketplace, defaultCurrency: ctx.workspace.defaultCurrency, defaultBasis: ctx.workspace.defaultBasis, timeZone: ctx.workspace.timeZone, settings: ctx.workspace.settings }}
         providers={listProviders()}
+        verification={await liveVerification()}
         mode={dataMode()}
         active={active}
         budget={JSON.parse(JSON.stringify(budget))}

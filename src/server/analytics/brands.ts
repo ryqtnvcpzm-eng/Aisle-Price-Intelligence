@@ -2,6 +2,7 @@ import "server-only";
 import { medianMinor, pctChange } from "@/lib/money";
 import { listGroups, listVariantRows, type VariantRow } from "../catalog/queries";
 import { getGroupDetail } from "../comparison/service";
+import { segmentBrands } from "../ml";
 
 export interface BrandStats {
   name: string;
@@ -21,6 +22,10 @@ export interface BrandStats {
   inStockShare: number;
   avgChange7d: number | null;
   avgChange30d: number | null;
+  /** Mean absolute 30-day price change across the brand's listings. */
+  movement30d: number | null;
+  /** Positioning segment from k-means over premium, discount share and movement (needs ≥4 brands with overlap). */
+  segment: { label: string; cluster: number } | null;
   rows: VariantRow[];
 }
 
@@ -35,7 +40,7 @@ export async function brandAnalytics(workspaceId: string): Promise<BrandStats[]>
     const key = r.brandName ?? "Unbranded";
     let b = byBrand.get(key);
     if (!b) {
-      b = { name: key, brandId: r.brandId, isReference: r.isReferenceBrand, families: 0, variants: 0, categories: [], marketplaces: [], comparableListings: 0, medianPremium: null, premiumSamples: 0, groupsCompeted: 0, groupsLowest: 0, discountedShare: null, inStockShare: 0, avgChange7d: null, avgChange30d: null, rows: [] };
+      b = { name: key, brandId: r.brandId, isReference: r.isReferenceBrand, families: 0, variants: 0, categories: [], marketplaces: [], comparableListings: 0, medianPremium: null, premiumSamples: 0, groupsCompeted: 0, groupsLowest: 0, discountedShare: null, inStockShare: 0, avgChange7d: null, avgChange30d: null, movement30d: null, segment: null, rows: [] };
       byBrand.set(key, b);
     }
     b.rows.push(r);
@@ -79,6 +84,15 @@ export async function brandAnalytics(workspaceId: string): Promise<BrandStats[]>
     const c30 = b.rows.map((r) => pctChange(r.p30, r.priceMinor)).filter((x): x is number => x !== null);
     b.avgChange7d = c7.length ? c7.reduce((s, x) => s + x, 0) / c7.length : null;
     b.avgChange30d = c30.length ? c30.reduce((s, x) => s + x, 0) / c30.length : null;
+    b.movement30d = c30.length ? c30.reduce((s, x) => s + Math.abs(x), 0) / c30.length : null;
+  }
+
+  // Positioning segments: only brands with a measured premium (i.e. that share comparison groups).
+  const eligible = [...byBrand.values()].filter((b) => b.medianPremium !== null);
+  const segments = segmentBrands(eligible.map((b) => ({ id: b.name, premium: b.medianPremium!, discountedShare: b.discountedShare ?? 0, movement: b.movement30d ?? 0 })));
+  for (const b of eligible) {
+    const s = segments.get(b.name);
+    if (s) b.segment = { label: s.label, cluster: s.cluster };
   }
   return [...byBrand.values()].sort((a, b) => Number(b.isReference) - Number(a.isReference) || b.variants - a.variants);
 }

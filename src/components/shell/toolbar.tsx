@@ -37,6 +37,8 @@ interface Status {
   mode: "demo" | "live";
   worker: { at: string; mode?: "queue" | "scheduled" } | null;
   queue?: "bullmq" | "scheduled";
+  /** Has the active real provider ever answered successfully here? null in demo mode. */
+  liveVerified?: boolean | null;
   budget: { monitoredListings: number; tokensLeft: number | null; failures24h: number; requests24h: number };
   jobs: { status: string; createdAt: string; observations: number }[];
 }
@@ -122,7 +124,7 @@ function MonitoringIndicator() {
       <div className="space-y-3 p-1">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Monitoring</div>
-          {data?.mode === "demo" ? <Badge tone="sim" size="xs">Demo data</Badge> : <Badge tone="good" size="xs">Live data</Badge>}
+          {data?.mode === "demo" ? <Badge tone="sim" size="xs">Demo data</Badge> : data?.liveVerified ? <Badge tone="good" size="xs">Live data</Badge> : <Badge tone="warn" size="xs">Live · unverified</Badge>}
         </div>
         <dl className="grid grid-cols-2 gap-y-2 text-xs">
           <dt className="text-ink-3">Background worker</dt>

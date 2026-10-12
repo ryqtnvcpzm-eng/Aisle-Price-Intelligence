@@ -40,6 +40,7 @@ interface Props {
   role: string;
   workspace: { name: string; defaultMarketplace: string; defaultCurrency: string | null; defaultBasis: string; timeZone: string; settings: { defaultIntervalMinutes: number; digest: string; emailAlerts: boolean; exportIncludeMethodology: boolean; significantChangePct: number; marketplaceIntervals?: Record<string, number> } };
   providers: ProviderInfo[];
+  verification: Partial<Record<string, string | null>>;
   mode: "demo" | "live";
   active: string;
   budget: BudgetSummary;
@@ -47,7 +48,7 @@ interface Props {
   integrations: { email: boolean; ai: boolean; retentionDays: number; shortLinks: boolean };
 }
 
-export function SettingsView({ user, role, workspace, providers, mode, active, budget, jobs, integrations }: Props) {
+export function SettingsView({ user, role, workspace, providers, verification, mode, active, budget, jobs, integrations }: Props) {
   const router = useRouter();
   const { theme, setTheme, reducedTransparency, setReducedTransparency, sidebarCollapsed, setSidebarCollapsed } = usePrefs();
   const [name, setName] = useState(workspace.name);
@@ -118,7 +119,7 @@ export function SettingsView({ user, role, workspace, providers, mode, active, b
             )}
           </div>
           <ul className="divide-y divide-[var(--hairline)]">
-            {providers.map((p) => <ProviderRow key={p.id} p={p} />)}
+            {providers.map((p) => <ProviderRow key={p.id} p={p} verifiedSince={verification[p.id] ?? null} />)}
           </ul>
         </Section>
 
@@ -205,7 +206,7 @@ function Row({ label, hint, value, control }: { label: string; hint?: string; va
   );
 }
 
-function ProviderRow({ p }: { p: ProviderInfo }) {
+function ProviderRow({ p, verifiedSince }: { p: ProviderInfo; verifiedSince: string | null }) {
   const [diag, setDiag] = useState<{ ok: boolean; message: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const caps = p.capabilities;
@@ -216,6 +217,7 @@ function ProviderRow({ p }: { p: ProviderInfo }) {
         {p.active && <Badge tone="accent" size="xs">Active for imports</Badge>}
         {p.configured ? <Badge tone="good" size="xs">Configured</Badge> : <Badge size="xs">Not configured</Badge>}
         {p.simulated && <Badge tone="sim" size="xs">Simulated</Badge>}
+        {!p.simulated && (verifiedSince ? <Badge tone="good" size="xs">Live responses since {new Date(verifiedSince).toLocaleDateString()}</Badge> : <Badge tone="warn" size="xs">Not yet verified live</Badge>)}
         {p.active && (
           <Button
             size="xs"
@@ -233,6 +235,9 @@ function ProviderRow({ p }: { p: ProviderInfo }) {
         )}
       </div>
       <p className="mt-1 text-xs text-ink-3">{p.note}</p>
+      {!p.simulated && !verifiedSince && (
+        <p className="mt-1 text-xs text-ink-3">This adapter follows Amazon’s published API and is covered by fixture-based tests, but no real response has been received in this deployment yet. Treat live tracking as unverified until “Test connection” succeeds.</p>
+      )}
       {diag && <p className={cn("mt-2 rounded-[8px] px-3 py-2 text-xs", diag.ok ? "bg-good-soft" : "bg-bad-soft")}>{diag.message}</p>}
       {caps && (
         <div className="mt-2.5 flex flex-wrap gap-1.5">

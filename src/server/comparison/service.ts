@@ -9,6 +9,7 @@ import { db } from "../db/client";
 import { brands, comparisonGroups, comparisonItems, variants } from "../db/schema";
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
+import { titleSimilarity } from "../ml";
 
 export async function getGroup(workspaceId: string, groupId: string) {
   const [g] = await db.select().from(comparisonGroups).where(and(eq(comparisonGroups.id, groupId), eq(comparisonGroups.workspaceId, workspaceId)));
@@ -160,6 +161,8 @@ export async function suggestForGroup(workspaceId: string, groupId: string) {
   if (!members.length) return [];
   const candidates = await listVariantRows(workspaceId);
   const memberIds = new Set(members.map((m) => m.variantId));
+  // TF-IDF over every title in the workspace, brand names removed, so equivalents from other brands surface.
+  const similar = titleSimilarity([...members, ...candidates].map((r) => ({ id: r.variantId, title: r.familyTitle, brand: r.brandName })));
   const out: { variant: VariantRow; score: number; reasons: string[] }[] = [];
   for (const c of candidates) {
     if (memberIds.has(c.variantId) || !c.tracked) continue;
@@ -169,7 +172,10 @@ export async function suggestForGroup(workspaceId: string, groupId: string) {
       const mq = m.quantities[0];
       const cq = c.quantities.find((q) => q.dimension === mq?.dimension) ?? c.quantities[0];
       const s = comparabilityScore({ category: m.categoryName, dimension: mq?.dimension ?? null, totalMilli: mq?.totalMilli ?? null }, { category: c.categoryName, dimension: cq?.dimension ?? null, totalMilli: cq?.totalMilli ?? null });
-      if (s.score > best.score) best = s;
+      const t = similar(m.variantId, c.variantId);
+      const score = Math.min(1, Math.round((s.score + 0.35 * t.score) * 100) / 100);
+      const reasons = t.score >= 0.2 && t.shared.length ? [...s.reasons, `Similar title: ${t.shared.slice(0, 3).map((w) => `“${w}”`).join(", ")}`] : s.reasons;
+      if (score > best.score) best = { score, reasons };
     }
     if (best.score >= 0.75) out.push({ variant: c, ...best });
   }
