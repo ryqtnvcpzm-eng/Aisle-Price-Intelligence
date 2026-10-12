@@ -253,6 +253,8 @@ async function main() {
       }
     }
   }
+  const [lastFired] = await db.select({ t: sql<Date>`max(${s.alertEvents.firedAt})` }).from(s.alertEvents).where(eq(s.alertEvents.ruleId, dropRule!.id));
+  if (lastFired?.t) await db.update(s.alertRules).set({ lastTriggeredAt: new Date(lastFired.t) }).where(eq(s.alertRules.id, dropRule!.id));
   activity.push({ workspaceId: ws!.id, actorUserId: userId, kind: "import", message: `Imported ${variantByAsin.size} variants across ${DEMO_FAMILIES.length} products (simulated catalog)`, isSimulated: true, createdAt: new Date(now - 120 * DAY) });
   for (let i = 0; i < activity.length; i += 500) await db.insert(s.activityLogs).values(activity.slice(i, i + 500));
 

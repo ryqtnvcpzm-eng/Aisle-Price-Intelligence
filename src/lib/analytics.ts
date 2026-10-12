@@ -53,9 +53,15 @@ export function toIntervals(points: Obs[], start: number, end: number, maxGapMs:
   for (let i = 0; i < seq.length; i++) {
     const p = seq[i]!;
     const next = seq[i + 1];
+    const prevT = seq[i - 1]?.t;
     const from = Math.max(p.t, start);
     const naturalEnd = next ? next.t : end;
-    const knownUntil = Math.min(naturalEnd, p.t + maxGapMs, end);
+    // Trust a reading for the larger of the global threshold and 2.5× the cadence
+    // at which this listing was being sampled (capped at 3 days). Sparse historical
+    // sampling stays continuous; a missed check inside dense sampling shows as a gap.
+    const localCadence = prevT !== undefined ? p.t - prevT : 0;
+    const trust = Math.min(3 * DAY, Math.max(maxGapMs, localCadence * 2.5));
+    const knownUntil = Math.min(naturalEnd, p.t + trust, end);
     if (knownUntil > from) out.push({ from, to: knownUntil, price: p.price, list: p.list, deal: p.deal, known: true });
     if (naturalEnd > knownUntil && knownUntil < end) out.push({ from: Math.max(knownUntil, start), to: Math.min(naturalEnd, end), price: null, list: null, deal: null, known: false });
   }

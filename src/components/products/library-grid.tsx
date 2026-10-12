@@ -53,7 +53,7 @@ const Card = memo(function Card({ f, index, selected, anySelected, onToggle, isN
           isNew && "shadow-[0_0_0_2px_var(--good),var(--shadow-md)]",
         )}
       >
-        <div className="relative aspect-[5/4] overflow-hidden rounded-[13px] bg-[#f4f4f6]">
+        <div className="relative aspect-[16/10] overflow-hidden sm:aspect-[5/4] rounded-[13px] bg-[#f4f4f6]">
           <ViewTransition name={`product-${f.familyId}`} share="morph" default="none">
             <div className="h-full w-full">
               <ProductImage src={f.imageUrl} alt={f.title} size="fill" rounded={13} className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
