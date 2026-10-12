@@ -68,7 +68,7 @@ export function reasonCopy(r: IncomparableReason | null) {
   return r ? REASON_COPY[r] : "";
 }
 
-export function compare(items: ComparisonInput[], basis: NormalizationBasis, locale = "en-IN"): ComparisonResult {
+export function compare(items: ComparisonInput[], basis: NormalizationBasis, locale?: string): ComparisonResult {
   // Majority currency among confirmed priced items defines the group currency.
   const counts = new Map<string, number>();
   for (const it of items) if (it.status === "confirmed" && it.currency && it.priceMinor !== null) counts.set(it.currency, (counts.get(it.currency) ?? 0) + 1);

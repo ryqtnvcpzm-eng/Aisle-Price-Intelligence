@@ -1,0 +1,434 @@
+@import "tailwindcss";
+
+/*
+ * Aisle design tokens. Semantic CSS variables are the single source of truth;
+ * Tailwind utilities map onto them (`bg-surface`, `text-ink-2`, …) so light,
+ * dark, high-contrast and reduced-transparency modes switch in one place.
+ * See docs/DESIGN_SYSTEM.md.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  color-scheme: light;
+  /* Planes */
+  --bg: #f5f5f7;
+  --bg-sunken: #ececf0;
+  --surface: #ffffff;
+  --surface-2: #fafafc;
+  --surface-3: #f2f2f5;
+  --elevated: #ffffff;
+  --sidebar: rgba(246, 246, 249, 0.86);
+  /* Ink */
+  --ink: #1d1d1f;
+  --ink-2: #57575c;
+  --ink-3: #86868b;
+  --ink-4: #aeaeb2;
+  --ink-inverse: #ffffff;
+  /* Lines */
+  --line: rgba(0, 0, 0, 0.075);
+  --line-strong: rgba(0, 0, 0, 0.13);
+  --hairline: rgba(0, 0, 0, 0.06);
+  /* Accent — Aisle blue */
+  --accent: #0a6fd6;
+  --accent-hover: #0862be;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(10, 111, 214, 0.1);
+  --accent-softer: rgba(10, 111, 214, 0.06);
+  --focus: rgba(10, 111, 214, 0.45);
+  /* Semantics — price direction is neutral (down ≠ good), always paired with ▲▼ */
+  --down: #0b7a8f;
+  --down-soft: rgba(11, 122, 143, 0.1);
+  --up: #b4561c;
+  --up-soft: rgba(180, 86, 28, 0.1);
+  --good: #1d8a3a;
+  --good-soft: rgba(29, 138, 58, 0.1);
+  --warn: #a86400;
+  --warn-soft: rgba(219, 145, 0, 0.13);
+  --bad: #c9342f;
+  --bad-soft: rgba(201, 52, 47, 0.09);
+  --sim: #8a5a00;
+  --sim-soft: rgba(219, 145, 0, 0.12);
+  /* Charts (validated categorical order; see DESIGN_SYSTEM.md) */
+  --chart-surface: #ffffff;
+  --chart-grid: #ececed;
+  --chart-axis: #c7c7cc;
+  --chart-muted: #8e8e93;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #6250d6;
+  --series-8: #e34948;
+  --series-other: #a1a1a6;
+  /* Depth */
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 24px -8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px -12px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.05);
+  --shadow-pop: 0 18px 50px -12px rgba(0, 0, 0, 0.28), 0 0 0 0.5px rgba(0, 0, 0, 0.08);
+  --ring-inset: inset 0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  /* Materials */
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.86);
+  --glass-edge: rgba(255, 255, 255, 0.7);
+  --glass-blur: 22px;
+  --scrim: rgba(18, 18, 22, 0.28);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --bg-sunken: #0a0a0b;
+  --surface: #161618;
+  --surface-2: #1c1c1e;
+  --surface-3: #232326;
+  --elevated: #232326;
+  --sidebar: rgba(20, 20, 22, 0.82);
+  --ink: #f5f5f7;
+  --ink-2: #b4b4ba;
+  --ink-3: #8a8a90;
+  --ink-4: #5d5d63;
+  --ink-inverse: #0b0b0c;
+  --line: rgba(255, 255, 255, 0.085);
+  --line-strong: rgba(255, 255, 255, 0.15);
+  --hairline: rgba(255, 255, 255, 0.06);
+  --accent: #3b8ff0;
+  --accent-hover: #5aa1f3;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(59, 143, 240, 0.16);
+  --accent-softer: rgba(59, 143, 240, 0.09);
+  --focus: rgba(90, 161, 243, 0.55);
+  --down: #4cc4d6;
+  --down-soft: rgba(76, 196, 214, 0.14);
+  --up: #f0975c;
+  --up-soft: rgba(240, 151, 92, 0.14);
+  --good: #3ccf63;
+  --good-soft: rgba(60, 207, 99, 0.13);
+  --warn: #f2b23a;
+  --warn-soft: rgba(242, 178, 58, 0.14);
+  --bad: #ff6961;
+  --bad-soft: rgba(255, 105, 97, 0.13);
+  --sim: #f2b23a;
+  --sim-soft: rgba(242, 178, 58, 0.13);
+  --chart-surface: #161618;
+  --chart-grid: #26262a;
+  --chart-axis: #3a3a3f;
+  --chart-muted: #8a8a90;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --series-other: #6e6e73;
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 16px 40px -12px rgba(0, 0, 0, 0.7), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --shadow-pop: 0 24px 60px -12px rgba(0, 0, 0, 0.75), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+  --ring-inset: inset 0 0 0 0.5px rgba(255, 255, 255, 0.07);
+  --glass: rgba(30, 30, 33, 0.66);
+  --glass-strong: rgba(36, 36, 40, 0.84);
+  --glass-edge: rgba(255, 255, 255, 0.09);
+  --scrim: rgba(0, 0, 0, 0.5);
+}
+
+/* High contrast: stronger ink and lines, no translucency. */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-2: #3a3a3c;
+    --ink-3: #575759;
+    --line: rgba(0, 0, 0, 0.22);
+    --line-strong: rgba(0, 0, 0, 0.4);
+    --glass: var(--surface);
+    --glass-strong: var(--surface);
+  }
+  :root[data-theme="dark"] {
+    --ink-2: #d1d1d6;
+    --ink-3: #aeaeb2;
+    --line: rgba(255, 255, 255, 0.25);
+    --line-strong: rgba(255, 255, 255, 0.4);
+  }
+}
+/* Reduced transparency: materials become solid surfaces. */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme="dark"] {
+    --glass: var(--elevated);
+    --glass-strong: var(--elevated);
+    --sidebar: var(--surface-2);
+    --glass-blur: 0px;
+  }
+}
+:root[data-transparency="reduced"] {
+  --glass: var(--elevated);
+  --glass-strong: var(--elevated);
+  --sidebar: var(--surface-2);
+  --glass-blur: 0px;
+}
+
+@theme inline {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--font-geist-sans), "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--font-geist-sans), "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", var(--font-geist-mono), Menlo, Consolas, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg-sunken: var(--bg-sunken);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-elevated: var(--elevated);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-hairline: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-softer: var(--accent-softer);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-sim: var(--sim);
+  --color-sim-soft: var(--sim-soft);
+
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-pop: var(--shadow-pop);
+
+  /* Type scale — tuned for analytical density with editorial headlines. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1.05rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.2rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.35rem;
+  --text-md: 0.9375rem;
+  --text-md--line-height: 1.4rem;
+  --text-lg: 1.0625rem;
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.7rem;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 2.1rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.6rem;
+  --text-4xl: 2.875rem;
+  --text-4xl--line-height: 3.2rem;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01";
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: var(--text-base--line-height);
+    letter-spacing: -0.006em;
+    overscroll-behavior-y: none;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.022em;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  button,
+  [role="button"] {
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+  }
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  input,
+  textarea,
+  select {
+    font: inherit;
+    letter-spacing: inherit;
+  }
+}
+
+@layer components {
+  /* Numbers that must align in columns. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "cv11";
+    letter-spacing: -0.01em;
+  }
+  /* Translucent material for navigation/control layers only (never content cards). */
+  .material {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    box-shadow: var(--shadow-pop), inset 0 0.5px 0 var(--glass-edge);
+  }
+  .material-strong {
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+  }
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm), var(--ring-inset);
+  }
+  .hairline-b {
+    box-shadow: inset 0 -0.5px 0 var(--line);
+  }
+  .hairline-t {
+    box-shadow: inset 0 0.5px 0 var(--line);
+  }
+  .eyebrow {
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--surface-3) 0%, var(--surface-2) 40%, var(--surface-3) 80%);
+    background-size: 200% 100%;
+    animation: shimmer 1.6s var(--ease-standard) infinite;
+    border-radius: 8px;
+  }
+  .scroll-fade-x {
+    mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Thin, quiet scrollbars on desktop. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Recharts: inherit tokens and keep chart chrome recessive. */
+.recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+}
+.recharts-text {
+  fill: var(--chart-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: var(--chart-axis);
+}
+.recharts-brush-traveller rect {
+  fill: var(--surface);
+  stroke: var(--line-strong);
+}
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
+
+/* View transitions (React <ViewTransition>): product image morph library → detail. */
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: via-blur;
+}
+@keyframes via-blur {
+  30% {
+    filter: blur(2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

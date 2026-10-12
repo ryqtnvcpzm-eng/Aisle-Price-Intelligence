@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  devIndicators: false,
   // Server-only packages that ship data files or native bindings.
   serverExternalPackages: ["pdfkit", "exceljs", "bullmq", "ioredis", "pino"],
   images: {

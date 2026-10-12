@@ -10,7 +10,7 @@ function cellText(col: ReportColumn, row: Row): string {
   if (v === null || v === undefined || v === "") return "—";
   switch (col.kind) {
     case "money":
-      return formatMoney(Number(v), String(row[col.currencyKey ?? "currency"] ?? "INR"), "en-IN", { trimZeros: false });
+      return formatMoney(Number(v), String(row[col.currencyKey ?? "currency"] ?? "INR"), undefined, { trimZeros: false });
     case "pct":
       return formatPct(Number(v), { signed: col.key.startsWith("ch") || col.key === "premium" || col.key === "change" });
     case "date":
@@ -147,7 +147,7 @@ export async function renderPdf(r: ReportData): Promise<Buffer> {
       const y = doc.y;
       doc.font("body").fontSize(8).fillColor(ink).text(String(row[s.bars.labelKey]).slice(0, 48), x0, y + 2, { width: labelW - 8, lineBreak: false });
       doc.rect(x0 + labelW, y + 2, Math.max(2, (v / max) * barW), 9).fill(row.role === "reference" ? accent : "#8e8e93");
-      doc.fillColor(muted).text(formatMoney(v, String(row[s.bars.currencyKey ?? "currency"] ?? "INR"), "en-IN", { trimZeros: false }), x0 + labelW + (v / max) * barW + 6, y + 2, { lineBreak: false });
+      doc.fillColor(muted).text(formatMoney(v, String(row[s.bars.currencyKey ?? "currency"] ?? "INR"), undefined, { trimZeros: false }), x0 + labelW + (v / max) * barW + 6, y + 2, { lineBreak: false });
       doc.y = y + 15;
     }
     doc.moveDown(0.8);

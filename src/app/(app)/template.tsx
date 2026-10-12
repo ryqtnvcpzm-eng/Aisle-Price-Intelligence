@@ -1,0 +1,13 @@
+"use client";
+
+import { motion } from "motion/react";
+import { duration, ease } from "@/components/motion/tokens";
+
+/** Page transition: the next page settles in with a short rise + fade. No theatrical slides. */
+export default function Template({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: duration.page, ease: ease.out }}>
+      {children}
+    </motion.div>
+  );
+}

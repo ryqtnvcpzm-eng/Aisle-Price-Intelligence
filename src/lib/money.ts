@@ -42,17 +42,24 @@ export function majorToMinor(amountMajor: number, currency: string): number {
 }
 
 /** Format integer minor units. Whole-unit prices drop trailing ".00" for calm tables. */
+const CURRENCY_LOCALE: Record<string, string> = { INR: "en-IN", USD: "en-US", CAD: "en-CA", GBP: "en-GB", EUR: "en-IE", JPY: "ja-JP", AUD: "en-AU", AED: "en-AE", MXN: "es-MX", BRL: "pt-BR", SEK: "sv-SE", PLN: "pl-PL", SGD: "en-SG", SAR: "en-SA", TRY: "tr-TR" };
+
+/** A locale that renders the currency the way its home marketplace does (₹1,19,999 · $1,199.99). */
+export function localeForCurrency(currency: string): string {
+  return CURRENCY_LOCALE[currency] ?? "en-US";
+}
+
 export function formatMoney(
   amountMinor: number | null | undefined,
   currency: string,
-  locale = "en-IN",
+  locale?: string,
   opts: { compact?: boolean; trimZeros?: boolean; decimals?: number } = {},
 ): string {
   if (amountMinor === null || amountMinor === undefined || Number.isNaN(amountMinor)) return "—";
   const exp = currencyExponent(currency);
   const whole = exp === 0 || amountMinor % 10 ** exp === 0;
   const decimals = opts.decimals ?? (opts.trimZeros !== false && whole ? 0 : undefined);
-  return formatter(currency, locale, { compact: opts.compact, decimals }).format(minorToMajor(amountMinor, currency));
+  return formatter(currency, locale ?? localeForCurrency(currency), { compact: opts.compact, decimals }).format(minorToMajor(amountMinor, currency));
 }
 
 export function formatSignedMoney(deltaMinor: number, currency: string, locale?: string) {
