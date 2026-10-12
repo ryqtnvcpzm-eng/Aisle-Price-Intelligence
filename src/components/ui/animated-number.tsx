@@ -2,6 +2,7 @@
 
 import { animate, useMotionValue, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { spring } from "../motion/tokens";
 import { cn } from "@/lib/cn";
 
 /**
@@ -30,7 +31,7 @@ export function AnimatedNumber({ value, format, className, animateOnMount = fals
       setFlash(true);
       setTimeout(() => setFlash(false), 900);
     }
-    const controls = animate(mv, value, { type: "spring", stiffness: 120, damping: 22, restDelta: 0.01 });
+    const controls = animate(mv, value, { type: "spring", stiffness: spring.gentle.stiffness, damping: spring.gentle.damping, mass: spring.gentle.mass, restDelta: 0.01 });
     return () => controls.stop();
   }, [value, reduce, mv, format, animateOnMount, emphasize]);
 
