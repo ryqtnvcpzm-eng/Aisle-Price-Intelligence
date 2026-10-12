@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { Activity, Bell, Check, Database, Download, Globe2, KeyRound, Monitor, Moon, Palette, RefreshCw, Sun, User, Users, X } from "lucide-react";
+import { Activity, Bell, Check, Database, Download, Globe2, KeyRound, Monitor, Moon, Palette, RefreshCw, Sun, User, Users, X, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ const SECTIONS = [
   { id: "providers", label: "Data providers", icon: KeyRound },
   { id: "usage", label: "API usage", icon: Activity },
   { id: "retention", label: "Data retention", icon: Database },
+  { id: "insights", label: "Insights", icon: Sparkles },
   { id: "appearance", label: "Appearance", icon: Palette },
   { id: "exports", label: "Export preferences", icon: Download },
 ];
@@ -124,16 +125,16 @@ export function SettingsView({ user, role, workspace, providers, verification, m
         </Section>
 
         <Section id="usage" title="API usage" description={`Provider: ${active}. Aisle uses only free data sources. Safeguards pause polling when a provider asks it to slow down.`}>
-          <div className="grid grid-cols-2 gap-px overflow-hidden bg-[var(--hairline)] sm:grid-cols-4">
-            {[
+          {/* Six cells fill a 3×2 grid exactly; the provider's allowance only appears when it reports one. */}
+          <div className="grid grid-cols-2 gap-px overflow-hidden bg-[var(--hairline)] sm:grid-cols-3">
+            {([
               ["Monitored listings", budget.monitoredListings],
               ["Requests / day (est.)", budget.requestsPerDay],
               ["Requests this month", budget.requestsMonth],
-              ["Items checked this month", budget.tokensUsedMonth],
-              ["Allowance left", budget.tokensLeft ?? "—"],
+              budget.tokensLeft !== null ? ["Allowance left", budget.tokensLeft] : ["Items checked this month", budget.tokensUsedMonth],
+              ["Failures · 24 h", `${budget.failures24h} of ${budget.requests24h}`],
               ["Cost", "Free"],
-              ["Failures (24h)", `${budget.failures24h} / ${budget.requests24h}`],
-            ].map(([k, v]) => (
+            ] as [string, number | string][]).map(([k, v]) => (
               <div key={k as string} className="bg-surface px-4 py-3">
                 <div className="text-2xs text-ink-3">{k}</div>
                 <div className="num mt-0.5 text-md font-semibold">{typeof v === "number" ? v.toLocaleString() : v}</div>
@@ -150,8 +151,8 @@ export function SettingsView({ user, role, workspace, providers, verification, m
                     <td className="py-2 text-ink-3">{relativeTime(j.createdAt)}</td>
                     <td className="py-2">{j.kind}</td>
                     <td className="py-2">{j.provider} · {j.marketplace}</td>
-                    <td className="num py-2 text-right">{j.listings} listings</td>
-                    <td className="num py-2 text-right">{j.observations} obs.</td>
+                    <td className="num py-2 text-right">{j.listings} {j.listings === 1 ? "listing" : "listings"}</td>
+                    <td className="num py-2 text-right">{j.observations} {j.observations === 1 ? "observation" : "observations"}</td>
                     <td className="py-2 pl-3 text-right"><Badge size="xs" tone={j.status === "succeeded" ? "good" : j.status === "failed" ? "bad" : j.status === "partial" ? "warn" : "neutral"}>{j.status}</Badge></td>
                   </tr>
                 ))}
@@ -161,9 +162,14 @@ export function SettingsView({ user, role, workspace, providers, verification, m
         </Section>
 
         <Section id="retention" title="Data retention" description="Set to whatever your provider licence allows. Older observations are deleted nightly by the worker.">
-          <Row label="Observation history" value={`${integrations.retentionDays} days (OBSERVATION_RETENTION_DAYS)`} />
+          <Row label="Observation history" hint="Set with OBSERVATION_RETENTION_DAYS." value={`${integrations.retentionDays} days`} />
           <Row label="Request logs" value="90 days" />
           <Row label="Activity" value="365 days" />
+        </Section>
+
+        <Section id="insights" title="Insights" description="Rule-based findings and local pattern detection, computed from your stored observations — no paid services.">
+          <Row label="Pattern detection" hint="Unusual moves (robust z-score), trends (regression), promotion cycles (autocorrelation) and brand segments (k-means) run inside Aisle." value="On" />
+          <Row label="Briefings" hint={integrations.ai ? "Built-in briefings, worded by an AI model because an Anthropic API key is set." : "Built-in briefings assembled from verified findings. Adding an Anthropic API key (billed separately from Claude chat plans) only changes the wording."} value={integrations.ai ? "Built-in + AI wording" : "Built-in"} />
         </Section>
 
         <Section id="appearance" title="Appearance">
@@ -174,7 +180,6 @@ export function SettingsView({ user, role, workspace, providers, verification, m
         </Section>
 
         <Section id="exports" title="Export preferences">
-          <Row label="AI briefings" hint="Optional. Off unless you add an Anthropic API key — API usage is separate from Claude chat plans." value={integrations.ai ? "Enabled" : "Off"} />
           <Row label="Methodology notes" hint="Every report includes how numbers were computed and data freshness." control={<Switch checked={workspace.settings.exportIncludeMethodology} onCheckedChange={(v) => setSetting("exportIncludeMethodology", v)} label="Include methodology" />} />
         </Section>
       </div>

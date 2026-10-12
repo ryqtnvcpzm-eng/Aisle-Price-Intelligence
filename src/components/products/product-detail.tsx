@@ -178,7 +178,7 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
             {f.isSimulated && <SimulatedBadge />}
             {f.archivedAt && <Badge tone="neutral" size="xs">Archived</Badge>}
           </div>
-          <h1 className="mt-1.5 text-2xl font-semibold leading-tight tracking-tight md:text-[28px]">{f.title}</h1>
+          <h1 className="mt-1.5 text-balance text-[22px] font-semibold leading-[1.2] tracking-tight sm:text-2xl md:text-[28px] md:leading-tight">{f.title}</h1>
           <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-3">
             {mp && <MarketplaceTag code={f.marketplace} showName />}
             {f.categoryName && <span>{f.categoryName}</span>}

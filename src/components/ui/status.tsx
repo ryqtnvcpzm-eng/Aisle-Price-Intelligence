@@ -63,11 +63,16 @@ export function Freshness({ state, lastSuccessAt, providerUpdatedAt, observedAt,
   );
 }
 
-export function SimulatedBadge({ className, compact }: { className?: string; compact?: boolean }) {
+/**
+ * `onImage`: product image tiles are always light (Amazon photos are shot on white), so a badge
+ * placed on one uses fixed light-tile colours instead of the theme's — dark-mode amber on a white
+ * tile is illegible.
+ */
+export function SimulatedBadge({ className, compact, onImage }: { className?: string; compact?: boolean; onImage?: boolean }) {
   return (
     <Tooltip content="Simulated demo data from Aisle's fictional catalog — not a real Amazon price.">
       <span tabIndex={0} className={cn("outline-none", className)}>
-        <Badge tone="sim" size="xs">
+        <Badge tone="sim" size="xs" className={onImage ? "bg-[rgba(255,248,235,0.92)] text-[#8a5a00] shadow-[0_0_0_0.5px_rgba(138,90,0,0.18)] backdrop-blur-sm" : undefined}>
           <FlaskConical className="size-3" aria-hidden />
           {compact ? "Sim" : "Simulated"}
         </Badge>

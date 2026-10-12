@@ -241,7 +241,8 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
           size="sm"
           value={state.status}
           onChange={(v) => set("status", v)}
-          className="max-w-full overflow-x-auto no-scrollbar"
+          // Scrolls on narrow screens; the edge fade says there is more.
+          className="max-w-full overflow-x-auto no-scrollbar [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] sm:[mask-image:none]"
           options={[
             { value: "all", label: "All" },
             { value: "favorites", label: <><Star className="size-3" /> Favorites</> },

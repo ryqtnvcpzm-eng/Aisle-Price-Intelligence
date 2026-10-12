@@ -14,7 +14,7 @@ import { getMarketplace, isMarketplaceCode, MARKETPLACES, PRIMARY_MARKETPLACES, 
 import { formatMoney } from "@/lib/money";
 import { formatQuantity, NORMALIZATION_BASES, type NormalizationBasis } from "@/lib/quantity";
 import { AutoHeight } from "../motion/auto-height";
-import { duration, ease, spring, staggerDelay } from "../motion/tokens";
+import { duration, ease, fadeTween, spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
@@ -398,7 +398,10 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
         </div>
 
         {/* Footer */}
-        <div className="flex items-center gap-2 px-6 py-4 hairline-t">
+        <div className="px-6 py-4 hairline-t">
+          {/* Footer actions swap in step with the body (same sequential timing), never ahead of it. */}
+          <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={phase === "preview" || phase === "saving" ? "preview" : phase === "done" ? "done" : "input"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={fadeTween} className="flex items-center gap-2">
           {phase === "preview" || phase === "saving" ? (
             <>
               <Button variant="ghost" onClick={() => { setPhase("input"); setPreview(null); }}>
@@ -437,6 +440,8 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
               </Button>
             </>
           )}
+          </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </Dialog>

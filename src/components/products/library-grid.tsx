@@ -53,14 +53,14 @@ const Card = memo(function Card({ f, index, selected, anySelected, onToggle, isN
           isNew && "shadow-[0_0_0_2px_var(--good),var(--shadow-md)]",
         )}
       >
-        <div className="relative aspect-[16/10] overflow-hidden sm:aspect-[5/4] rounded-[13px] bg-[#f4f4f6]">
+        <div className="relative aspect-[16/10] overflow-hidden rounded-[13px] bg-[#f4f4f6] sm:aspect-[5/4] dark:bg-[#e6e6ea]">
           <ViewTransition name={`product-${f.familyId}`} share="morph" default="none">
             <div className="h-full w-full">
               <ProductImage src={f.imageUrl} alt={f.title} size="fill" rounded={13} className="h-full w-full transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
             </div>
           </ViewTransition>
           <div className="absolute left-2 top-2 flex gap-1">
-            {f.isSimulated && <SimulatedBadge compact />}
+            {f.isSimulated && <SimulatedBadge compact onImage />}
             {isNew && <Badge tone="good" size="xs">New</Badge>}
           </div>
         </div>
@@ -69,7 +69,7 @@ const Card = memo(function Card({ f, index, selected, anySelected, onToggle, isN
             {f.favorite && <Star className="size-3 shrink-0 fill-[#f5a623] text-[#f5a623]" aria-label="Favorite" />}
             <span className="truncate font-medium text-ink-2">{f.brandName ?? "Unbranded"}</span>
             {f.isReferenceBrand && <Badge tone="accent" size="xs">Ref</Badge>}
-            <MarketplaceTag code={f.marketplace} className="ml-auto shrink-0" />
+            <MarketplaceTag code={f.marketplace} className="ml-auto shrink-0 [&>span:last-child]:hidden xl:[&>span:last-child]:inline" />
           </div>
           <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug tracking-tight">{f.title.replace(f.brandName ?? "", "").trim()}</h3>
           <div className="mt-auto pt-3">

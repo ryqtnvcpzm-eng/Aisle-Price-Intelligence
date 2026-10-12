@@ -72,7 +72,7 @@ export function Toolbar({ title }: { title?: string }) {
           trigger={
             <button className="flex h-8 items-center gap-1.5 rounded-[9px] px-2 text-sm text-ink-2 outline-none transition-colors hover:bg-[var(--hairline)] hover:text-ink" aria-label="Marketplace filter">
               <span className="text-[14px] leading-none">{marketplace && isMarketplaceCode(marketplace) ? MARKETPLACES[marketplace].flag : "🌐"}</span>
-              <span className="hidden lg:inline">{marketplace && isMarketplaceCode(marketplace) ? MARKETPLACES[marketplace].domain.replace("www.", "") : "All marketplaces"}</span>
+              <span className="hidden whitespace-nowrap xl:inline">{marketplace && isMarketplaceCode(marketplace) ? MARKETPLACES[marketplace].domain.replace("www.", "") : "All marketplaces"}</span>
               <ChevronDown className="size-3.5 text-ink-3" />
             </button>
           }

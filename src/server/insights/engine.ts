@@ -37,6 +37,8 @@ export interface Insight {
   coverage: { observations: number; share: number | null };
   href: string;
   isSimulated: boolean;
+  /** Currency of money-valued metrics (from/to/price…); null when metrics aren't money. */
+  currency?: string | null;
 }
 
 const nameOf = (v: VariantRow) => `${v.brandName ? `${v.brandName} ` : ""}${v.label}`;
@@ -55,7 +57,7 @@ export async function computeInsights(workspaceId: string, opts: { significantPc
   if (!rows.length) return [];
   const series = await loadSeries([...new Set(rows.map((r) => r.listingId))], new Date(now - 60 * DAY));
   const out: Insight[] = [];
-  const base = (v: VariantRow) => ({ items: [{ variantId: v.variantId, familyId: v.familyId, name: nameOf(v) }], isSimulated: v.isSimulated, href: `/products/${v.familyId}?variant=${v.variantId}` });
+  const base = (v: VariantRow) => ({ items: [{ variantId: v.variantId, familyId: v.familyId, name: nameOf(v) }], isSimulated: v.isSimulated, href: `/products/${v.familyId}?variant=${v.variantId}`, currency: v.currency });
 
   for (const v of rows) {
     const pts: Obs[] = series.get(v.listingId) ?? [];
@@ -182,13 +184,15 @@ export async function computeInsights(workspaceId: string, opts: { significantPc
     // 4c. Sustained trend (least-squares fit over daily samples; several distinct moves required).
     const trend = detectTrend(pts, { now, maxGap: Math.max(gap, 48 * HOUR) });
     if (trend) {
+      // The fit is an estimate: show it in whole currency units, not false precision.
+      const whole = (m: number) => (v.currency === "JPY" ? m : Math.round(m / 100) * 100);
       out.push({
         id: `trend:${v.variantId}`,
         kind: "price_trend",
         severity: Math.min(70, 38 + Math.abs(trend.weeklyRatio) * 600),
         tone: "neutral",
         headline: `${nameOf(v)} has trended ${trend.weeklyRatio < 0 ? "down" : "up"} about ${formatPct(Math.abs(trend.weeklyRatio))} a week`,
-        explanation: `A straight-line fit over ${trend.days} days of observed prices (${trend.changes} changes) runs from about ${fmt(v, trend.fittedStart)} to ${fmt(v, trend.fittedEnd)} and explains ${Math.round(trend.r2 * 100)}% of the variation.`,
+        explanation: `A straight-line fit over ${trend.days} days of observed prices (${trend.changes} changes) runs from about ${fmt(v, whole(trend.fittedStart))} to ${fmt(v, whole(trend.fittedEnd))} and explains ${Math.round(trend.r2 * 100)}% of the variation.`,
         metrics: { weeklyRatio: trend.weeklyRatio, r2: trend.r2, changes: trend.changes },
         period: `Last ${trend.days} days`,
         evidence: [`Method: least-squares regression on daily step-function samples (R² ${trend.r2})`, `${trend.samples} of ${trend.days + 1} days had a known price`],
@@ -266,6 +270,7 @@ export async function computeInsights(workspaceId: string, opts: { significantPc
         at: new Date(now).toISOString(),
         coverage: { observations: units.length, share: null },
         isSimulated: best.v.isSimulated,
+        currency: best.v.currency,
         href: `/products/${best.v.familyId}`,
       });
     }

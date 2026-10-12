@@ -74,10 +74,11 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
       <section className="card p-5">
         <SectionHeader title="Price position" description="Median unit-price premium vs. other brands in the same comparison groups" />
         <ul className="mt-4 space-y-2.5">
-          {stats.map((s, i) => (
+          {/* Highest premium first; brands without a comparison overlap sit last, muted. */}
+          {[...stats].sort((a, b) => (a.medianPremium === null ? 1 : 0) - (b.medianPremium === null ? 1 : 0) || (b.medianPremium ?? 0) - (a.medianPremium ?? 0)).map((s, i) => (
             <motion.li key={s.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: staggerDelay(i) }}>
               <button onClick={() => setActive(s.name)} className={cn("grid w-full grid-cols-[160px_1fr_72px] items-center gap-3 rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--hairline)]", active === s.name && "bg-accent-softer")}>
-                <span className="flex items-center gap-2 truncate text-sm font-medium">
+                <span className={cn("flex items-center gap-2 truncate text-sm font-medium", s.medianPremium === null && "text-ink-3")}>
                   <span className="size-2.5 shrink-0 rounded-full" style={{ background: colors.get(s.name) ?? OTHER_VAR }} />
                   <span className="truncate">{s.name}</span>
                 </span>
@@ -129,7 +130,7 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
                 <li key={p.id}>
                   <Link href={`/products/${p.id}`} className="-mx-2 flex items-center gap-3 rounded-[10px] px-2 py-1.5 hover:bg-[var(--hairline)]">
                     <ProductImage src={p.imageUrl} alt="" size={32} rounded={8} />
-                    <span className="min-w-0 flex-1 truncate text-sm">{p.title}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">{p.title.startsWith(brand.name) ? p.title.slice(brand.name.length).replace(/^[\s,·:-]+/, "") : p.title}</span>
                     <MarketplaceTag code={p.marketplace} />
                     <span className="text-xs text-ink-3">{p.variants} var.</span>
                   </Link>
@@ -164,8 +165,11 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
               <thead>
                 <tr className="text-left text-2xs uppercase tracking-wide text-ink-3">
                   <th className="pb-2 font-semibold">Metric</th>
-                  <th className="max-w-[110px] truncate pb-2 pl-3 text-right font-semibold">{ref?.name ?? stats[0]!.name}</th>
-                  <th className="max-w-[110px] truncate pb-2 pl-3 text-right font-semibold">{other.name}</th>
+                  {[ref ?? stats[0]!, other].map((b) => (
+                    <th key={b.name} className="w-[30%] pb-2 pl-3 text-right align-bottom text-xs font-medium normal-case tracking-normal text-ink-2">
+                      <span className="inline-flex items-start justify-end gap-1.5 text-balance"><span className="mt-1 size-2 shrink-0 rounded-full" style={{ background: colors.get(b.name) ?? OTHER_VAR }} />{b.name}</span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -200,6 +204,9 @@ function Segments({ stats, colors, onPick }: { stats: BrandData[]; colors: Map<s
   const groups = [...new Map(stats.filter((s) => s.segment).map((s) => [s.segment!.cluster, s.segment!.label])).entries()].map(([cluster, label]) => ({ cluster, label, members: stats.filter((s) => s.segment?.cluster === cluster) }));
   if (groups.length < 2) return null;
   const med = (xs: number[]) => (xs.length ? [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]! : null);
+  // Only mention discount share when it actually differs between segments (e.g. India lists below MRP everywhere).
+  const discounts = groups.map((g) => med(g.members.map((m) => m.discountedShare ?? 0)));
+  const discountInformative = new Set(discounts.map((d) => (d === null ? "n" : d.toFixed(2)))).size > 1;
   return (
     <section className="card p-5">
       <SectionHeader title="Positioning segments" description="Brands that price alike, found by clustering — tracked listings only" />
@@ -212,7 +219,7 @@ function Segments({ stats, colors, onPick }: { stats: BrandData[]; colors: Map<s
               <div className="text-sm font-semibold tracking-tight">{g.label}</div>
               <div className="num mt-0.5 text-2xs text-ink-3">
                 {premium !== null && `${formatPct(premium, { signed: true })} vs peers`}
-                {discounted !== null && ` · ${formatPct(discounted)} discounted`}
+                {discountInformative && discounted !== null && ` · ${formatPct(discounted)} discounted`}
               </div>
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {g.members.map((m) => (

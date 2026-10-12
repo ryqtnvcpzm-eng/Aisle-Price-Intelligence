@@ -35,7 +35,8 @@ export function Dialog({ open, onOpenChange, title, description, children, class
                 initial={{ opacity: 0, y: 18, scale: 0.985 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.985, transition: { duration: duration.control, ease: ease.in } }}
-                transition={spring.panel}
+                // A sheet must read as solid almost at once: 100 ms fade, geometry on the panel spring.
+                transition={{ ...spring.panel, opacity: { duration: 0.1, ease: ease.out } }}
                 className={cn(
                   "fixed inset-x-0 bottom-0 z-[61] flex max-h-[92dvh] flex-col overflow-hidden rounded-t-[22px] bg-surface pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-pop)] outline-none",
                   "sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-[9vh] sm:max-h-[82vh] sm:w-[calc(100vw-48px)] sm:-translate-x-1/2 sm:rounded-[20px] sm:pb-0",

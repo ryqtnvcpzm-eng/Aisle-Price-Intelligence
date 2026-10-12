@@ -10,7 +10,7 @@ export function Tabs<T extends string>({ value, onChange, tabs, className }: { v
   const id = useId();
   return (
     <LayoutGroup id={id}>
-      <div role="tablist" className={cn("flex items-center gap-1 hairline-b", className)}>
+      <div role="tablist" className={cn("no-scrollbar flex items-center gap-1 overflow-x-auto hairline-b [mask-image:linear-gradient(to_right,#000_calc(100%-24px),transparent)] sm:[mask-image:none]", className)}>
         {tabs.map((t) => {
           const active = t.value === value;
           return (
@@ -25,11 +25,11 @@ export function Tabs<T extends string>({ value, onChange, tabs, className }: { v
                 if (e.key === "ArrowRight") onChange(tabs[(i + 1) % tabs.length]!.value);
                 if (e.key === "ArrowLeft") onChange(tabs[(i - 1 + tabs.length) % tabs.length]!.value);
               }}
-              className={cn("relative flex h-10 items-center gap-1.5 px-2.5 text-sm font-medium transition-colors", active ? "text-ink" : "text-ink-3 hover:text-ink-2")}
+              className={cn("relative flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap px-2.5 text-sm font-medium transition-colors", active ? "text-ink" : "text-ink-3 hover:text-ink-2")}
             >
               {t.label}
               {t.count !== undefined && <span className="num rounded-full bg-[var(--hairline)] px-1.5 text-2xs text-ink-3">{t.count}</span>}
-              {active && <motion.span layoutId="tab-underline" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-ink" transition={spring.snappy} />}
+              {active && <motion.span layoutId="tab-underline" className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-ink" transition={spring.snappy} />}
             </button>
           );
         })}

@@ -7,7 +7,7 @@ import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/freshness";
-import { formatPct } from "@/lib/money";
+import { formatMoney, formatPct } from "@/lib/money";
 import type { Insight } from "@/server/insights/engine";
 import { spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
@@ -19,6 +19,27 @@ import { SimulatedBadge } from "../ui/status";
 const ICONS: Record<string, typeof Sparkles> = { competitor_cut: TrendingDown, competitor_raise: TrendingUp, observed_low: TrendingDown, brand_premium: Layers, reference_lost_lead: BarChart3, volatility_up: Waves, unit_economics: Sparkles, competitor_unavailable: CircleSlash, discount_ended: AlertTriangle, unusual_move: Zap, price_trend: TrendingUp, promo_cycle: Repeat };
 const KIND_LABEL: Record<string, string> = { competitor_cut: "Competitor move", competitor_raise: "Competitor move", observed_low: "Observed low", brand_premium: "Positioning", reference_lost_lead: "Leadership", volatility_up: "Volatility", unit_economics: "Unit economics", competitor_unavailable: "Availability", discount_ended: "Promotion", unusual_move: "Unusual move", price_trend: "Trend", promo_cycle: "Promotion cycle" };
 const PATTERN_KINDS = ["unusual_move", "price_trend", "promo_cycle"];
+
+/** Human labels and formats for the evidence panel — never raw minor units or ISO strings. */
+const METRIC_LABEL: Record<string, string> = { from: "Before", to: "After", ratio: "Change", price: "Price now", previousLow: "Previous low", best: "Best unit price", worst: "Highest unit price", saving: "Saving", medianPremium: "Median premium", listings: "Listings", recentChanges: "Changes · last 14 days", priorChanges: "Changes · prior 14 days", z: "Robust z-score", unusualZ: "Robust z-score", weeklyRatio: "Trend per week", r2: "Fit (R²)", changes: "Price changes", periodDays: "Cycle length", acf: "Autocorrelation", episodes: "Discount episodes", lastSeen: "Lowest seen" };
+const MONEY_KEYS = new Set(["from", "to", "price", "previousLow", "best", "worst", "lastSeen"]);
+const PCT_KEYS = new Set(["ratio", "saving", "medianPremium", "weeklyRatio"]);
+function formatMetric(key: string, v: number | string | null, currency: string | null | undefined) {
+  if (v === null || v === undefined) return "—";
+  if (typeof v !== "number") return String(v);
+  if (MONEY_KEYS.has(key) && currency) return formatMoney(v, currency, undefined, { trimZeros: !["best", "worst"].includes(key) });
+  if (PCT_KEYS.has(key)) return formatPct(v, { signed: key === "ratio" || key === "weeklyRatio" });
+  if (key === "periodDays") return `${v} days`;
+  if (key === "r2" || key === "acf") return v.toFixed(2);
+  if (key === "z" || key === "unusualZ") return v.toFixed(1);
+  return v.toLocaleString();
+}
+/** Evidence lines carry ISO timestamps for auditability; show them in the reader's locale. */
+function humanizeEvidence(line: string) {
+  return line
+    .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }))
+    .replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString(undefined, { day: "numeric", month: "short", timeZone: "UTC" }));
+}
 
 export function InsightsView({ insights }: { insights: Insight[] }) {
   const [filter, setFilter] = useState<"all" | "competitors" | "positioning" | "patterns" | "availability">("all");
@@ -63,7 +84,7 @@ export function InsightsView({ insights }: { insights: Insight[] }) {
 
       <ul className="space-y-2">
         {shown.map((ins, i) => {
-          const Icon = ICONS[ins.kind] ?? Sparkles;
+          const Icon = ins.kind === "price_trend" && Number(ins.metrics.weeklyRatio) < 0 ? TrendingDown : (ICONS[ins.kind] ?? Sparkles);
           const isOpen = open === ins.id;
           return (
             <motion.li key={ins.id} layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: staggerDelay(i) }} className="card overflow-hidden">
@@ -89,16 +110,15 @@ export function InsightsView({ insights }: { insights: Insight[] }) {
                     <div className="grid gap-4 px-5 pb-5 pl-[76px] md:grid-cols-3">
                       <div>
                         <div className="eyebrow">Evidence</div>
-                        <ul className="mt-1.5 space-y-1 text-xs text-ink-2">{ins.evidence.map((e, j) => <li key={j}>• {e}</li>)}</ul>
+                        <ul className="mt-1.5 space-y-1 text-xs text-ink-2">{ins.evidence.map((e, j) => <li key={j} suppressHydrationWarning>• {humanizeEvidence(e)}</li>)}</ul>
                       </div>
                       <div>
                         <div className="eyebrow">Metrics</div>
                         <dl className="mt-1.5 space-y-0.5 text-xs">
                           {Object.entries(ins.metrics).map(([k, v]) => (
-                            <div key={k} className="flex justify-between gap-3"><dt className="text-ink-3">{k}</dt><dd className="num text-ink">{typeof v === "number" && Math.abs(v) < 5 && !Number.isInteger(v) ? formatPct(v) : String(v ?? "—")}</dd></div>
+                            <div key={k} className="flex justify-between gap-3"><dt className="text-ink-3">{METRIC_LABEL[k] ?? k}</dt><dd className="num text-ink">{formatMetric(k, v, ins.currency)}</dd></div>
                           ))}
                         </dl>
-                        <p className="mt-1.5 text-2xs text-ink-4">Amounts in minor units (e.g. paise).</p>
                       </div>
                       <div>
                         <div className="eyebrow">Coverage</div>

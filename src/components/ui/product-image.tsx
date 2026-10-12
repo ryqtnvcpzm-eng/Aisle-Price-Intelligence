@@ -54,7 +54,7 @@ export function ProductImage({ src, alt, size = 40, className, layoutId, rounded
   const dims = size === "fill" ? { width: "100%", height: "100%" } : { width: size, height: size };
   const showImage = Boolean(src) && status !== "error";
   return (
-    <motion.div layoutId={layoutId} data-image-status={src ? status : "none"} className={cn("relative shrink-0 overflow-hidden bg-[#f4f4f6] dark:bg-[#ececef]", className)} style={{ ...dims, borderRadius: rounded }}>
+    <motion.div layoutId={layoutId} data-image-status={src ? status : "none"} className={cn("relative shrink-0 overflow-hidden bg-[#f4f4f6] dark:bg-[#e6e6ea]", className)} style={{ ...dims, borderRadius: rounded }}>
       {status === "loading" && <div className="skeleton absolute inset-0" aria-hidden />}
       {showImage ? (
         <img
@@ -66,7 +66,7 @@ export function ProductImage({ src, alt, size = 40, className, layoutId, rounded
           decoding="async"
           onLoad={() => settle(src, "loaded")}
           onError={() => settle(src, "error")}
-          className={cn("relative h-full w-full object-contain", status === "ssr" || status === "cached" ? "opacity-100" : "transition-opacity duration-300 ease-out", status === "loaded" && "opacity-100", status === "loading" && "opacity-0")}
+          className={cn("relative h-full w-full object-contain dark:brightness-[0.94]", status === "ssr" || status === "cached" ? "opacity-100" : "transition-opacity duration-300 ease-out", status === "loaded" && "opacity-100", status === "loading" && "opacity-0")}
           referrerPolicy="no-referrer"
         />
       ) : (
