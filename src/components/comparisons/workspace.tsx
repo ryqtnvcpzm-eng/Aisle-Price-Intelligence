@@ -403,7 +403,7 @@ function Timeline({ items, result, basis }: { items: GroupItemRow[]; result: Com
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-md font-semibold tracking-tight">Price over time</div>
-          <div className="text-xs text-ink-3">Toggle lines without losing your range. Colors follow brands; dashes separate a brand's variants.</div>
+          <div className="text-xs text-ink-3">Toggle lines without losing your range. Colors follow brands; dashes separate a brand’s variants.</div>
         </div>
         <Segmented ariaLabel="Measure" size="sm" value={mode} onChange={setMode} options={[{ value: "unit", label: `Unit ${def.label}` }, { value: "price", label: "Shelf price" }]} />
       </div>
@@ -416,7 +416,7 @@ function Timeline({ items, result, basis }: { items: GroupItemRow[]; result: Com
         unitScale={mode === "unit" ? unitScale : undefined}
         unitLabel={mode === "unit" ? def.label : undefined}
       />
-      {mode === "unit" && excluded.length > 0 && <p className="text-xs text-ink-3">{excluded.length} listing(s) hidden from the unit view because their quantity isn't expressed in this basis.</p>}
+      {mode === "unit" && excluded.length > 0 && <p className="text-xs text-ink-3">{excluded.length} listing(s) hidden from the unit view because their quantity isn’t expressed in this basis.</p>}
       {result.currency === null && <p className="text-xs text-warn">No priced listings yet.</p>}
     </div>
   );

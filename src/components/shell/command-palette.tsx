@@ -51,6 +51,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     try {
+      // Re-read on open: other tabs may have added recents. Storage is client-only.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRecents(JSON.parse(localStorage.getItem(RECENTS_KEY) ?? "[]"));
     } catch {
       /* ignore */
@@ -91,13 +93,15 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [router, importer]);
 
-  const { data, isFetching } = useQuery({
+  const { data: raw, isFetching } = useQuery({
     queryKey: ["search", debounced],
     queryFn: () => api<SearchResult>(`/api/search?q=${encodeURIComponent(debounced)}`),
     enabled: open,
     staleTime: 15_000,
     placeholderData: (prev) => prev,
   });
+  // Never let Enter pick a result computed for an older query.
+  const data = debounced === query ? raw : undefined;
 
   const go = useCallback(
     (href: string, label: string) => {
@@ -168,6 +172,16 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                           ))}
                         </Command.Group>
                       )}
+                      {query && (
+                      <Command.Group heading="Go to">
+                        {NAV.filter((n) => n.label.toLowerCase().includes(query.toLowerCase())).map((n) => (
+                          <Command.Item key={n.href} value={`nav-${n.href}`} className={item} onSelect={() => go(n.href, n.label)}>
+                            <n.icon /> <span className="flex-1">{n.label}</span>
+                            <span className="text-2xs uppercase tracking-wider opacity-60">{n.key}</span>
+                          </Command.Item>
+                        ))}
+                      </Command.Group>
+                      )}
                       {data?.products.length ? (
                         <Command.Group heading="Products">
                           {data.products.map((p) => (
@@ -229,14 +243,17 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                             </Command.Item>
                           ))}
                       </Command.Group>
+
+                      {!query && (
                       <Command.Group heading="Go to">
-                        {NAV.filter((n) => !query || n.label.toLowerCase().includes(query.toLowerCase())).map((n) => (
+                        {NAV.map((n) => (
                           <Command.Item key={n.href} value={`nav-${n.href}`} className={item} onSelect={() => go(n.href, n.label)}>
                             <n.icon /> <span className="flex-1">{n.label}</span>
                             <span className="text-2xs uppercase tracking-wider opacity-60">{n.key}</span>
                           </Command.Item>
                         ))}
                       </Command.Group>
+                      )}
                     </Command.List>
                     <div className="flex items-center gap-4 px-4 py-2.5 text-2xs text-ink-3 hairline-t">
                       <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> navigate</span>

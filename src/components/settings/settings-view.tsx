@@ -8,7 +8,8 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { relativeTime } from "@/lib/freshness";
+import { useNow } from "@/lib/hooks/use-now";
+import { relativeTime, workerAlive } from "@/lib/freshness";
 import { MARKETPLACES, PRIMARY_MARKETPLACES } from "@/lib/marketplaces";
 import { NORMALIZATION_BASES } from "@/lib/quantity";
 import type { ProviderInfo } from "@/server/providers";
@@ -43,7 +44,7 @@ interface Props {
   active: string;
   budget: BudgetSummary;
   jobs: { id: string; kind: string; status: string; provider: string; marketplace: string; listings: number; observations: number; tokens: number; createdAt: string; error: string | null }[];
-  integrations: { email: boolean; ai: boolean; fx: boolean; retentionDays: number; shortLinks: boolean };
+  integrations: { email: boolean; ai: boolean; retentionDays: number; shortLinks: boolean };
 }
 
 export function SettingsView({ user, role, workspace, providers, mode, active, budget, jobs, integrations }: Props) {
@@ -92,7 +93,7 @@ export function SettingsView({ user, role, workspace, providers, mode, active, b
 
         <Section id="marketplaces" title="Marketplaces & units">
           <Row label="Default marketplace" hint="Used for bare ASINs. Links are always detected from their domain." control={<Select ariaLabel="Default marketplace" size="sm" value={workspace.defaultMarketplace} onValueChange={(v) => save({ defaultMarketplace: v })} options={PRIMARY_MARKETPLACES.map((m) => ({ value: m, label: `${MARKETPLACES[m].flag} ${MARKETPLACES[m].name}` }))} />} />
-          <Row label="Default currency" hint={integrations.fx ? "Converted values are labelled with rate and timestamp." : "Currencies are never mixed. Conversion needs an exchange-rate provider (FX_API_URL)."} control={<Select ariaLabel="Default currency" size="sm" value={workspace.defaultCurrency ?? "native"} onValueChange={(v) => save({ defaultCurrency: v === "native" ? null : v })} options={[{ value: "native", label: "Native marketplace currency" }, ...["INR", "USD", "EUR", "GBP"].map((c) => ({ value: c, label: c }))]} />} />
+          <Row label="Currency" hint="Prices are never converted or mixed across currencies; cross-marketplace views compare percentage changes instead." value="Each marketplace’s own currency" />
           <Row label="Default unit basis" hint="Starting basis for new comparisons." control={<Select ariaLabel="Default basis" size="sm" value={workspace.defaultBasis} onValueChange={(v) => save({ defaultBasis: v })} options={Object.entries(NORMALIZATION_BASES).map(([k, v]) => ({ value: k, label: v.long }))} />} />
         </Section>
 
@@ -111,7 +112,7 @@ export function SettingsView({ user, role, workspace, providers, mode, active, b
         <Section id="providers" title="Data providers">
           <div className={cn("mx-5 mb-2 rounded-[12px] px-4 py-3 text-sm", mode === "demo" ? "bg-sim-soft" : "bg-good-soft")}>
             {mode === "demo" ? (
-              <><span className="font-semibold text-sim">Demo mode.</span> <span className="text-ink-2">No provider credentials are configured, so Aisle uses its fictional catalog with simulated prices. Every simulated value is labelled. Add <code className="font-mono text-xs">KEEPA_API_KEY</code> to switch to live data.</span></>
+              <><span className="font-semibold text-sim">Demo mode.</span> <span className="text-ink-2">No provider credentials are configured, so Aisle uses its fictional catalog with simulated prices. Every simulated value is labelled. Add Amazon Creators API credentials (free with an Associates account) to switch to live data.</span></>
             ) : (
               <><span className="font-semibold text-good">Live data.</span> <span className="text-ink-2">New imports use {providers.find((p) => p.active)?.label}. Existing simulated listings stay labelled.</span></>
             )}
@@ -121,16 +122,15 @@ export function SettingsView({ user, role, workspace, providers, mode, active, b
           </ul>
         </Section>
 
-        <Section id="usage" title="API usage" description={`Provider: ${active}. Budget safeguards pause polling when the monthly allowance or token bucket runs out.`}>
+        <Section id="usage" title="API usage" description={`Provider: ${active}. Aisle uses only free data sources. Safeguards pause polling when a provider asks it to slow down.`}>
           <div className="grid grid-cols-2 gap-px overflow-hidden bg-[var(--hairline)] sm:grid-cols-4">
             {[
               ["Monitored listings", budget.monitoredListings],
               ["Requests / day (est.)", budget.requestsPerDay],
-              ["Tokens / day (est.)", budget.tokensPerDayEstimate],
-              ["Tokens this month", budget.tokensUsedMonth],
-              ["Monthly budget", budget.budgetTokensMonth ?? "No cap"],
-              ["Tokens left (provider)", budget.tokensLeft ?? "—"],
-              ["Est. monthly cost", budget.estimatedMonthlyCostUsd === null ? "Set KEEPA_TOKEN_COST_USD" : `$${budget.estimatedMonthlyCostUsd.toFixed(2)}`],
+              ["Requests this month", budget.requestsMonth],
+              ["Items checked this month", budget.tokensUsedMonth],
+              ["Allowance left", budget.tokensLeft ?? "—"],
+              ["Cost", "Free"],
               ["Failures (24h)", `${budget.failures24h} / ${budget.requests24h}`],
             ].map(([k, v]) => (
               <div key={k as string} className="bg-surface px-4 py-3">
@@ -173,8 +173,8 @@ export function SettingsView({ user, role, workspace, providers, mode, active, b
         </Section>
 
         <Section id="exports" title="Export preferences">
+          <Row label="AI briefings" hint="Optional. Off unless you add an Anthropic API key — API usage is separate from Claude chat plans." value={integrations.ai ? "Enabled" : "Off"} />
           <Row label="Methodology notes" hint="Every report includes how numbers were computed and data freshness." control={<Switch checked={workspace.settings.exportIncludeMethodology} onCheckedChange={(v) => setSetting("exportIncludeMethodology", v)} label="Include methodology" />} />
-          <Row label="AI briefings" value={integrations.ai ? "Enabled (ANTHROPIC_API_KEY)" : "Not configured — Aisle is fully functional without it"} />
         </Section>
       </div>
     </div>
@@ -248,7 +248,8 @@ function ProviderRow({ p }: { p: ProviderInfo }) {
 }
 
 function WorkerStatus() {
-  const { data } = useQuery({ queryKey: ["status"], queryFn: () => api<{ worker: { at: string } | null }>("/api/providers/status"), refetchInterval: 30_000 });
-  const alive = data?.worker && Date.now() - new Date(data.worker.at).getTime() < 120_000;
-  return <span className={cn("inline-flex items-center gap-1.5 text-sm", alive ? "text-good" : "text-warn")}><span className={cn("size-2 rounded-full", alive ? "bg-good" : "bg-warn")} />{alive ? `Worker running · heartbeat ${relativeTime(data!.worker!.at)}` : "Worker not detected"}</span>;
+  const { data } = useQuery({ queryKey: ["status"], queryFn: () => api<{ worker: { at: string; mode?: "queue" | "scheduled" } | null }>("/api/providers/status"), refetchInterval: 30_000 });
+  const now = useNow();
+  const alive = workerAlive(data?.worker, now);
+  return <span className={cn("inline-flex items-center gap-1.5 text-sm", alive ? "text-good" : "text-warn")}><span className={cn("size-2 rounded-full", alive ? "bg-good" : "bg-warn")} />{alive ? `${data?.worker?.mode === "scheduled" ? "Scheduled runner" : "Worker running"} · last heartbeat ${relativeTime(data!.worker!.at)}` : "Worker not detected"}</span>;
 }

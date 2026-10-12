@@ -34,6 +34,8 @@ export function PreferencesProvider({ children, initialSidebarCollapsed, initial
 
   useEffect(() => {
     try {
+      // Storage is client-only; reading it after mount keeps SSR markup and hydration identical.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setThemeState((localStorage.getItem("aisle-theme") as ThemePref) || "system");
       setRT(localStorage.getItem("aisle-transparency") === "reduced");
     } catch {

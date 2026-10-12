@@ -16,7 +16,8 @@ import { sqlClient } from "../src/server/db/client";
 import { env } from "../src/server/env";
 import { logger } from "../src/server/logger";
 import { runMaintenance } from "../src/server/monitoring/maintenance";
-import { getQueue, HEARTBEAT_KEY, QUEUE_NAME, type RefreshJobData } from "../src/server/monitoring/queue";
+import { writeHeartbeat } from "../src/server/monitoring/heartbeat";
+import { getQueue, QUEUE_NAME, type RefreshJobData } from "../src/server/monitoring/queue";
 import { runRefreshJob } from "../src/server/monitoring/refresh";
 import { scanDueListings } from "../src/server/monitoring/scheduler";
 import { ProviderError } from "../src/server/providers";
@@ -54,6 +55,10 @@ async function processJob(job: Job) {
 }
 
 async function main() {
+  if (!env.REDIS_URL) {
+    logger.fatal("REDIS_URL is required for the long-running worker. On hosts without Redis, schedule `pnpm worker:once` hourly instead (see docs/DEPLOYMENT.md).");
+    process.exit(1);
+  }
   const queue = getQueue();
   // Idempotent schedulers: re-running the worker updates rather than duplicates them.
   await queue.upsertJobScheduler("scan-every-5m", { every: 5 * 60_000 }, { name: "scan", opts: { attempts: 1 } });
@@ -74,7 +79,7 @@ async function main() {
   const redis = getRedis();
   const beat = async () => {
     try {
-      await redis.set(HEARTBEAT_KEY, JSON.stringify({ at: new Date().toISOString(), pid: process.pid }), "EX", 90);
+      await writeHeartbeat("queue", 90);
     } catch {
       /* redis briefly unavailable */
     }

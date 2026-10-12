@@ -1,11 +1,13 @@
 import "server-only";
 import { betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { db } from "../db/client";
 import * as schema from "../db/schema";
 import { env } from "../env";
 import { provisionWorkspaceForUser } from "../workspace/provision";
+import { signupAllowed } from "./allowlist";
 
 export const auth = betterAuth({
   appName: "Aisle",
@@ -36,6 +38,12 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        before: async (candidate) => {
+          if (!signupAllowed(candidate.email, env.SIGNUP_ALLOWLIST)) {
+            throw new APIError("FORBIDDEN", { message: "Sign-ups are restricted on this Aisle deployment. Ask the owner to add your email." });
+          }
+          return { data: candidate };
+        },
         after: async (created) => {
           await provisionWorkspaceForUser({ id: created.id, name: created.name, email: created.email });
         },

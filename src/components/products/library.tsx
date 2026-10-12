@@ -60,6 +60,8 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LS_KEY);
+      // Storage is client-only; restoring after mount keeps hydration identical to the server render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setState((s) => ({ ...s, ...JSON.parse(saved), q: "" }));
     } catch {
       /* ignore */

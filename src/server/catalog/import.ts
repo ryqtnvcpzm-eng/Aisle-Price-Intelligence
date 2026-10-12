@@ -331,6 +331,7 @@ export async function commitImport(ctx: AppContext, input: CommitInput) {
   const requestedAt = new Date();
   const result = await db.transaction(async (tx) => {
     const familyIds: string[] = [];
+    const brandIds: string[] = [];
     const variantIds: string[] = [];
     const listingIds: string[] = [];
     let groupId = input.groupId ?? null;
@@ -364,6 +365,7 @@ export async function commitImport(ctx: AppContext, input: CommitInput) {
           .onConflictDoUpdate({ target: [brands.workspaceId, brands.slug], set: { name: sql`${brands.name}` } })
           .returning({ id: brands.id });
         brandId = b!.id;
+        brandIds.push(brandId);
       }
       const categoryName = sel.categoryName || primary.categoryPath?.at(-1) || null;
       let categoryId: string | null = null;
@@ -477,7 +479,7 @@ export async function commitImport(ctx: AppContext, input: CommitInput) {
       },
       tx,
     );
-    return { familyIds, variantIds, groupId };
+    return { familyIds, variantIds, groupId, brandIds: [...new Set(brandIds)] };
   });
   return result;
 }

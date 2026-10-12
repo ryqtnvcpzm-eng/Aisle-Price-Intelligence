@@ -59,7 +59,9 @@ export function toIntervals(points: Obs[], start: number, end: number, maxGapMs:
     // Trust a reading for the larger of the global threshold and 2.5× the cadence
     // at which this listing was being sampled (capped at 3 days). Sparse historical
     // sampling stays continuous; a missed check inside dense sampling shows as a gap.
-    const localCadence = prevT !== undefined ? p.t - prevT : 0;
+    // First point: borrow the cadence of the following pair, if any.
+    const afterNext = seq[i + 2]?.t;
+    const localCadence = prevT !== undefined ? p.t - prevT : next && afterNext !== undefined ? afterNext - next.t : 0;
     const trust = Math.min(3 * DAY, Math.max(maxGapMs, localCadence * 2.5));
     const knownUntil = Math.min(naturalEnd, p.t + trust, end);
     if (knownUntil > from) out.push({ from, to: knownUntil, price: p.price, list: p.list, deal: p.deal, known: true });

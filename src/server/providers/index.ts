@@ -7,7 +7,6 @@ import { logger } from "../logger";
 import { setRequestRecorder } from "./accounting";
 import { CreatorsProvider } from "./creators";
 import { DemoProvider } from "./demo";
-import { KeepaProvider } from "./keepa";
 import type { DataProvider, ProviderId } from "./types";
 
 export * from "./types";
@@ -43,7 +42,6 @@ setRequestRecorder(async (log) => {
       monthKey: mk,
       tokensUsedMonth: log.tokensConsumed ?? 0,
       requestsMonth: 1,
-      budgetTokensMonth: log.provider === "keepa" ? (env.KEEPA_MONTHLY_TOKEN_BUDGET ?? null) : null,
     })
     .onConflictDoUpdate({
       target: providerQuotas.provider,
@@ -58,9 +56,6 @@ setRequestRecorder(async (log) => {
     });
 });
 
-export function isKeepaConfigured() {
-  return Boolean(env.KEEPA_API_KEY);
-}
 export function isCreatorsConfigured() {
   return Boolean(env.CREATORS_API_CREDENTIAL_ID && env.CREATORS_API_CREDENTIAL_SECRET && env.CREATORS_API_CREDENTIAL_VERSION && env.CREATORS_API_PARTNER_TAG);
 }
@@ -70,10 +65,6 @@ export function getProvider(id: ProviderId): DataProvider {
   if (existing) return existing;
   let p: DataProvider;
   switch (id) {
-    case "keepa":
-      if (!env.KEEPA_API_KEY) throw new Error("KEEPA_API_KEY is not configured");
-      p = new KeepaProvider({ apiKey: env.KEEPA_API_KEY });
-      break;
     case "creators":
       if (!isCreatorsConfigured()) throw new Error("Creators API credentials are not configured");
       p = new CreatorsProvider({
@@ -95,12 +86,10 @@ export function getProvider(id: ProviderId): DataProvider {
 /** The provider used for new imports. */
 export function activeProviderId(): ProviderId {
   switch (env.DATA_PROVIDER) {
-    case "keepa":
     case "creators":
     case "demo":
       return env.DATA_PROVIDER;
     default:
-      if (isKeepaConfigured()) return "keepa";
       if (isCreatorsConfigured()) return "creators";
       return "demo";
   }
@@ -139,16 +128,15 @@ export function listProviders(): ProviderInfo[] {
     } catch {
       p = null;
     }
-    return { id, label: p?.label ?? (id === "keepa" ? "Keepa" : "Amazon Creators API"), configured, active: active === id, simulated: id === "demo", capabilities: p?.capabilities ?? null, note };
+    return { id, label: p?.label ?? (id === "creators" ? "Amazon Creators API" : "Demo"), configured, active: active === id, simulated: id === "demo", capabilities: p?.capabilities ?? null, note };
   };
   return [
-    info("keepa", isKeepaConfigured(), "Primary real-data provider. Prices, history, variations and token quota for 12 Amazon marketplaces. Requires a paid Keepa API plan (KEEPA_API_KEY)."),
     info(
       "creators",
       isCreatorsConfigured(),
       env.CREATORS_API_LICENSE_ACK === "true"
-        ? "Amazon Associates API. Monitoring enabled by operator acknowledgement of the Associates agreement."
-        : "Amazon Associates API. Used for lookups only; scheduled price storage stays off unless your agreement permits it (CREATORS_API_LICENSE_ACK).",
+        ? "Amazon’s free Associates API. Monitoring enabled by operator acknowledgement of the Associates agreement."
+        : "Amazon’s free Associates API. Used for lookups only; scheduled price storage stays off unless your agreement permits it (CREATORS_API_LICENSE_ACK).",
     ),
     info("demo", true, "Fictional catalog with simulated prices. Always available; every value is labelled simulated."),
   ];

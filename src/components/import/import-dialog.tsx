@@ -41,7 +41,7 @@ const INTERVALS = [
   { value: "paused", label: "Don't monitor yet" },
 ];
 
-export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGroupId, onDone }: { open: boolean; onOpenChange: (v: boolean) => void; prefill: string; groupId?: string; onDone?: (r: { familyIds: string[]; variantIds: string[]; groupId: string | null }) => void }) {
+export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGroupId, onDone }: { open: boolean; onOpenChange: (v: boolean) => void; prefill: string; groupId?: string; onDone?: (r: { familyIds: string[]; variantIds: string[]; groupId: string | null; brandIds?: string[] }) => void }) {
   const app = useApp();
   const router = useRouter();
   const [text, setText] = useState(prefill);
@@ -113,7 +113,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
     if (!preview || !totalSelected) return;
     setPhase("saving");
     try {
-      const res = await api<{ familyIds: string[]; variantIds: string[]; groupId: string | null }>("/api/import/commit", {
+      const res = await api<{ familyIds: string[]; variantIds: string[]; groupId: string | null; brandIds?: string[] }>("/api/import/commit", {
         method: "POST",
         body: {
           previewId: preview.previewId,
@@ -327,7 +327,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
 
                 {preview.errors.length > 0 && (
                   <div className="space-y-1.5 rounded-[12px] bg-warn-soft px-3.5 py-3">
-                    <div className="text-xs font-semibold text-ink">{preview.errors.length} couldn't be imported</div>
+                    <div className="text-xs font-semibold text-ink">{preview.errors.length} couldn’t be imported</div>
                     {preview.errors.map((e, i) => (
                       <div key={i} className="text-xs text-ink-2">
                         <span className="font-medium text-ink">{e.input.length > 48 ? `${e.input.slice(0, 46)}…` : e.input}</span> — {e.message}

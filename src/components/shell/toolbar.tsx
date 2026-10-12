@@ -8,7 +8,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { relativeTime } from "@/lib/freshness";
+import { useNow } from "@/lib/hooks/use-now";
+import { relativeTime, workerAlive } from "@/lib/freshness";
 import { MARKETPLACES, isMarketplaceCode } from "@/lib/marketplaces";
 import { spring, staggerDelay } from "../motion/tokens";
 import { Badge, Kbd } from "../ui/badge";
@@ -34,7 +35,8 @@ interface NotificationRow {
 
 interface Status {
   mode: "demo" | "live";
-  worker: { at: string } | null;
+  worker: { at: string; mode?: "queue" | "scheduled" } | null;
+  queue?: "bullmq" | "scheduled";
   budget: { monitoredListings: number; tokensLeft: number | null; failures24h: number; requests24h: number };
   jobs: { status: string; createdAt: string; observations: number }[];
 }
@@ -98,7 +100,9 @@ export function Toolbar({ title }: { title?: string }) {
 
 function MonitoringIndicator() {
   const { data } = useQuery({ queryKey: ["status"], queryFn: () => api<Status>("/api/providers/status"), refetchInterval: 60_000 });
-  const alive = data?.worker && Date.now() - new Date(data.worker.at).getTime() < 120_000;
+  const now = useNow();
+  const alive = workerAlive(data?.worker, now);
+  const scheduled = data?.worker?.mode === "scheduled" || data?.queue === "scheduled";
   const last = data?.jobs.find((j) => j.status === "succeeded" || j.status === "partial");
   return (
     <Popover
@@ -122,7 +126,7 @@ function MonitoringIndicator() {
         </div>
         <dl className="grid grid-cols-2 gap-y-2 text-xs">
           <dt className="text-ink-3">Background worker</dt>
-          <dd className={cn("text-right font-medium", alive ? "text-good" : "text-warn")}>{alive ? "Running" : "No heartbeat"}</dd>
+          <dd className={cn("text-right font-medium", alive ? "text-good" : "text-warn")}>{alive ? (scheduled ? "Scheduled · hourly" : "Running") : "No heartbeat"}</dd>
           <dt className="text-ink-3">Monitored listings</dt>
           <dd className="num text-right">{data?.budget.monitoredListings ?? "—"}</dd>
           <dt className="text-ink-3">Last batch</dt>
@@ -130,7 +134,7 @@ function MonitoringIndicator() {
           <dt className="text-ink-3">Requests (24h)</dt>
           <dd className="num text-right">{data ? `${data.budget.requests24h} · ${data.budget.failures24h} failed` : "—"}</dd>
         </dl>
-        {!alive && data && <p className="rounded-[8px] bg-warn-soft px-2.5 py-2 text-xs text-ink-2">Hourly refreshes run in the separate worker process (<code className="font-mono">pnpm worker</code>). Manual refresh still works.</p>}
+        {!alive && data && <p className="rounded-[8px] bg-warn-soft px-2.5 py-2 text-xs text-ink-2">{scheduled ? <>Hourly refreshes run on a schedule (<code className="font-mono">pnpm worker:once</code>) and none has reported in the last two hours.</> : <>Hourly refreshes run in the separate worker process (<code className="font-mono">pnpm worker</code>).</>} Manual refresh still works.</p>}
         <Link href="/settings#monitoring" className="block text-xs font-medium text-accent">Monitoring settings →</Link>
       </div>
     </Popover>
@@ -175,7 +179,7 @@ function Notifications() {
       </div>
       <div className="max-h-[420px] overflow-y-auto px-1.5 pb-1.5">
         {!data?.notifications.length ? (
-          <div className="px-4 py-10 text-center text-sm text-ink-3">You're all caught up.</div>
+          <div className="px-4 py-10 text-center text-sm text-ink-3">You’re all caught up.</div>
         ) : (
           data.notifications.map((n, i) => (
             <motion.div key={n.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: staggerDelay(i) }}>

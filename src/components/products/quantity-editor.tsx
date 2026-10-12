@@ -66,7 +66,7 @@ export function QuantityEditor({ variantId, quantities, label }: { variantId: st
               from “{q.matchedText ?? q.sourceText}”
             </p>
           ) : (
-            <p className="mt-0.5 text-xs text-ink-3">The provider didn't state a quantity Aisle could parse.</p>
+            <p className="mt-0.5 text-xs text-ink-3">The provider didn’t state a quantity Aisle could parse.</p>
           )}
         </div>
         <Select ariaLabel="Measure" className="w-full" value={dimension} onValueChange={(d) => { setDimension(d); setUnit(UNITS[d]![0]!); }} options={[{ value: "mass", label: "Weight" }, { value: "volume", label: "Volume" }, { value: "count", label: "Count (tablets, items…)" }, { value: "serving", label: "Servings" }]} />

@@ -8,7 +8,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // Docker images use the standalone server; Vercel and similar hosts build normally.
+  output: process.env.BUILD_STANDALONE === "1" ? "standalone" : undefined,
+  // The PDF renderer reads bundled fonts from disk at runtime.
+  outputFileTracingIncludes: { "/api/reports/export": ["./assets/fonts/**"] },
   poweredByHeader: false,
   reactStrictMode: true,
   devIndicators: false,

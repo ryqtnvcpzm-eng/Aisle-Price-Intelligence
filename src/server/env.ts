@@ -8,15 +8,13 @@ import { z } from "zod";
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().url().default("postgres://postgres:postgres@localhost:5432/aisle"),
-  REDIS_URL: z.string().default("redis://localhost:6379"),
+  /** Optional. Without it, Aisle caches in Postgres and monitoring runs via `pnpm worker:once` on a schedule. */
+  REDIS_URL: z.string().min(1).optional(),
   BETTER_AUTH_SECRET: z.string().min(16).default("dev-only-insecure-secret-change-me-please"),
   BETTER_AUTH_URL: z.string().url().default("http://localhost:3000"),
 
-  /** "demo" | "keepa" | "creators". Demo is used automatically when no credentials exist. */
-  DATA_PROVIDER: z.enum(["auto", "demo", "keepa", "creators"]).default("auto"),
-  KEEPA_API_KEY: z.string().optional(),
-  KEEPA_MONTHLY_TOKEN_BUDGET: z.coerce.number().int().positive().optional(),
-  KEEPA_TOKEN_COST_USD: z.coerce.number().nonnegative().optional(),
+  /** "auto" | "demo" | "creators". Aisle only integrates free data sources; demo is used when no credentials exist. */
+  DATA_PROVIDER: z.enum(["auto", "demo", "creators"]).default("auto"),
   CREATORS_API_CREDENTIAL_ID: z.string().optional(),
   CREATORS_API_CREDENTIAL_SECRET: z.string().optional(),
   CREATORS_API_CREDENTIAL_VERSION: z.string().optional(),
@@ -32,9 +30,11 @@ const schema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Aisle <alerts@example.com>"),
+  /** Optional, opt-in. The feature is hidden and nothing is called unless a key is set. */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-opus-5-5"),
-  FX_API_URL: z.string().url().optional(),
+  /** Comma-separated emails and/or @domains allowed to sign up. Unset or "*" = open registration. */
+  SIGNUP_ALLOWLIST: z.string().optional(),
   DEMO_ACCOUNT_ENABLED: z.enum(["true", "false"]).default("true"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
 });
@@ -42,7 +42,9 @@ const schema = z.object({
 export type Env = z.infer<typeof schema>;
 
 function load(): Env {
-  const parsed = schema.safeParse(process.env);
+  // Treat blank values (common in hosting dashboards and .env templates) as unset.
+  const raw = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid environment configuration:\n${issues}`);

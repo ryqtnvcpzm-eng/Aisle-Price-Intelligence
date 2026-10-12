@@ -13,7 +13,7 @@ import { spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog } from "../ui/dialog";
-import { EmptyState, SectionHeader } from "../ui/empty-state";
+import { EmptyState } from "../ui/empty-state";
 import { Field, Input } from "../ui/input";
 import { Menu, MenuItem, MenuSeparator } from "../ui/popover";
 import { Segmented } from "../ui/segmented";
@@ -78,6 +78,8 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
 
   useEffect(() => {
     if (params.get("new") === "1") {
+      // One-shot deep link (?new=1) from elsewhere in the app: open the editor, then clean the URL.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPrefill({ variantId: params.get("variant") || undefined, groupId: params.get("group") || undefined });
       setEditing("new");
       router.replace("/alerts");
@@ -157,7 +159,7 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
                 })}
               </ul>
             )}
-            <p className="mt-3 text-xs text-ink-3">Alerts from simulated demo data appear in-app only — they're never emailed. Use “Send test notification” to try delivery.{emailConfigured ? "" : " Email isn't configured (RESEND_API_KEY), so alerts are in-app."}</p>
+            <p className="mt-3 text-xs text-ink-3">Alerts from simulated demo data appear in-app only — they’re never emailed. Use “Send test notification” to try delivery.{emailConfigured ? "" : " Email isn't configured (RESEND_API_KEY), so alerts are in-app."}</p>
           </motion.div>
         ) : (
           <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>

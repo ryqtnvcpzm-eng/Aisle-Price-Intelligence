@@ -17,7 +17,7 @@
     "worker:dev": "tsx watch --conditions=react-server worker/index.ts",
     "worker:once": "tsx --conditions=react-server worker/run-once.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
@@ -28,7 +28,7 @@
     "setup": "pnpm db:migrate && pnpm db:seed"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
+    "@anthropic-ai/sdk": "0.133.0",
     "@tanstack/react-query": "5.104.2",
     "@tanstack/react-table": "8.21.3",
     "@tanstack/react-virtual": "3.14.15",

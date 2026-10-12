@@ -107,7 +107,7 @@ function Flow({ info }: { info: AppInfo }) {
                   <Logo size={72} />
                 </motion.div>
                 <h1 className="mt-8 text-4xl font-semibold tracking-tight">Welcome to Aisle</h1>
-                <p className="mt-3 max-w-[460px] text-lg text-ink-2">See every competitor's price — per variant, per gram, over time — without lifting a finger.</p>
+                <p className="mt-3 max-w-[460px] text-lg text-ink-2">See every competitor’s price — per variant, per gram, over time — without lifting a finger.</p>
                 <ul className="mt-10 grid w-full gap-3 text-left sm:grid-cols-3">
                   {[
                     { icon: Link2, t: "Paste a link", d: "We find every size and flavour." },
@@ -183,7 +183,15 @@ function Flow({ info }: { info: AppInfo }) {
                   <motion.button
                     layout
                     whileTap={{ scale: 0.985 }}
-                    onClick={() => importer.open(undefined, { onDone: (r) => setImports((x) => [...x, r]) })}
+                    onClick={() =>
+                      importer.open(undefined, {
+                        onDone: (r) => {
+                          // The first product added during onboarding is the user's own: make its brand the reference.
+                          if (!imports.length && r.brandIds?.[0]) void api("/api/brands/reference", { method: "POST", body: { brandId: r.brandIds[0] } });
+                          setImports((x) => [...x, r]);
+                        },
+                      })
+                    }
                     className="flex w-full items-center gap-3 rounded-[16px] border border-dashed border-[var(--line-strong)] bg-surface-2 p-5 text-left transition-colors hover:border-accent hover:bg-accent-softer"
                   >
                     <span className="flex size-10 items-center justify-center rounded-[12px] bg-accent text-white">

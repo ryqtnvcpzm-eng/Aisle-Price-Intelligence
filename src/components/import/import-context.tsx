@@ -7,6 +7,7 @@ export interface ImportResult {
   familyIds: string[];
   variantIds: string[];
   groupId: string | null;
+  brandIds?: string[];
 }
 
 interface ImportCtx {

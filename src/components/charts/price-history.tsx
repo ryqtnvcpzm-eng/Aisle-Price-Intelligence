@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { Brush, CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { useNow } from "@/lib/hooks/use-now";
 import { formatMoney, formatPct } from "@/lib/money";
 import { DASHES, brandColorMap, SERIES_VARS, OTHER_VAR } from "@/lib/series-colors";
 import type { HistorySeries } from "@/server/analytics/history";
@@ -75,14 +76,14 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
   const [showTable, setShowTable] = useState(false);
   const [showEvents, setShowEvents] = useState(true);
 
+  // "Now" bucketed to the minute so the query key is stable across renders.
+  const nowMinute = useNow(60_000);
   const win = useMemo(() => {
-    const now = Date.now();
+    const now = nowMinute;
     if (range === "custom") return { from: new Date(custom.from).getTime(), to: Math.min(now, new Date(custom.to).getTime() + 864e5 - 1) };
     if (range === "all") return { from: now - 3 * 365 * 864e5, to: now };
     return { from: now - RANGE_MS[range], to: now };
-    // Bucket "now" to the minute so the query key is stable across renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [range, custom, Math.floor(Date.now() / 60000)]);
+  }, [range, custom, nowMinute]);
 
   const { data, isFetching, isPlaceholderData, error } = useQuery({
     queryKey: ["history", selected.slice().sort().join(","), win.from, win.to],
@@ -138,7 +139,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
   const visible = plotted.filter((s) => !hidden.has(s.variantId));
 
   // Merge onto the union of change times; each series evaluated as a step function.
-  const rows = useMemo(() => {
+  const rows = (() => {
     const ts = new Set<number>();
     for (const s of visible) for (const p of s.points) ts.add(p.t);
     const sorted = [...ts].sort((a, b) => a - b);
@@ -147,7 +148,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
       for (const s of visible) row[s.variantId] = stepValue(s.points, t);
       return row;
     });
-  }, [visible]);
+  })();
 
   const allVals = rows.flatMap((r) => visible.map((s) => r[s.variantId])).filter((v): v is number => typeof v === "number");
   const minV = allVals.length ? Math.min(...allVals) : 0;
@@ -251,7 +252,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
         {!data && isFetching ? (
           <Skeleton className="h-full w-full rounded-[14px]" />
         ) : error ? (
-          <div className="flex h-full items-center justify-center text-sm text-ink-3">Couldn't load history. {String((error as Error).message)}</div>
+          <div className="flex h-full items-center justify-center text-sm text-ink-3">Couldn’t load history. {String((error as Error).message)}</div>
         ) : !visible.length || !rows.length ? (
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-sm text-ink-3">
             <span>No observations in this window.</span>
@@ -320,7 +321,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
         )}
       </div>
 
-      {excluded.length > 0 && <p className="text-xs text-warn">{excluded.length} series priced in another currency ({[...new Set(excluded.map((e) => e.currency))].join(", ")}) aren't drawn on this axis — Aisle never mixes currencies.</p>}
+      {excluded.length > 0 && <p className="text-xs text-warn">{excluded.length} series priced in another currency ({[...new Set(excluded.map((e) => e.currency))].join(", ")}) aren’t drawn on this axis — Aisle never mixes currencies.</p>}
       {eventsShown && visible.length > 0 && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
           {["decrease", "increase", "out_of_stock", "back_in_stock"].map((k) => (

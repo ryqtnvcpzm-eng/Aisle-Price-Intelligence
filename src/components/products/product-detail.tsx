@@ -474,7 +474,7 @@ function Offers({ variants, observations }: { variants: VariantRow[]; observatio
     <div className="space-y-4">
       <div className="flex gap-2.5 rounded-[12px] bg-surface-2 px-3.5 py-2.5 text-xs text-ink-2 shadow-[var(--ring-inset)]">
         <Info className="mt-px size-4 shrink-0 text-ink-3" />
-        <span>Aisle doesn't compute a universal checkout price: tax, delivery location, Prime eligibility and coupon redemption aren't known. “Not reported” means the provider didn't supply that price type — not that it doesn't exist.</span>
+        <span>Aisle doesn’t compute a universal checkout price: tax, delivery location, Prime eligibility and coupon redemption aren’t known. “Not reported” means the provider didn’t supply that price type — not that it doesn’t exist.</span>
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[960px] text-sm">

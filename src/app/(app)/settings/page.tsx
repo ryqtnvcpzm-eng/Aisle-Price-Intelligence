@@ -1,6 +1,6 @@
+import { aiEnabled } from "@/server/ai/explain";
 import { SettingsView } from "@/components/settings/settings-view";
 import { Page } from "@/components/ui/page";
-import { aiEnabled } from "@/server/ai/explain";
 import { env } from "@/server/env";
 import { budgetSummary } from "@/server/monitoring/budget";
 import { listRecentJobs } from "@/server/monitoring/scheduler";
@@ -24,7 +24,7 @@ export default async function SettingsPage() {
         active={active}
         budget={JSON.parse(JSON.stringify(budget))}
         jobs={jobs.map((j) => ({ id: j.id, kind: j.kind, status: j.status, provider: j.provider, marketplace: j.marketplace, listings: j.listingIds.length, observations: j.observationsWritten, tokens: j.tokensUsed, createdAt: j.createdAt.toISOString(), error: j.error }))}
-        integrations={{ email: Boolean(env.RESEND_API_KEY), ai: aiEnabled(), fx: Boolean(env.FX_API_URL), retentionDays: env.OBSERVATION_RETENTION_DAYS, shortLinks: env.ALLOW_SHORT_LINK_RESOLUTION === "true" }}
+        integrations={{ email: Boolean(env.RESEND_API_KEY), ai: aiEnabled(), retentionDays: env.OBSERVATION_RETENTION_DAYS, shortLinks: env.ALLOW_SHORT_LINK_RESOLUTION === "true" }}
       />
     </Page>
   );

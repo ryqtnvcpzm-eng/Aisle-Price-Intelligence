@@ -6,7 +6,7 @@
  */
 import type { MarketplaceCode } from "@/lib/marketplaces";
 
-export type ProviderId = "keepa" | "creators" | "demo";
+export type ProviderId = "creators" | "demo";
 export type Availability = "in_stock" | "out_of_stock" | "limited" | "preorder" | "unknown";
 export type PriceBasis = "buy_box" | "amazon" | "lowest_new" | "none";
 export type ListingStatus = "active" | "unavailable" | "discontinued" | "not_found" | "invalid";

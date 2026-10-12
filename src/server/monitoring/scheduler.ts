@@ -8,6 +8,7 @@ import { env } from "../env";
 import { logger } from "../logger";
 import { getProvider, type ProviderId } from "../providers";
 import { checkBudget } from "./budget";
+import { redisConfigured } from "../redis";
 import { getQueue } from "./queue";
 import { runRefreshJob } from "./refresh";
 
@@ -106,6 +107,11 @@ export async function enqueueRefresh(opts: {
     .onConflictDoNothing({ target: monitoringJobs.idempotencyKey })
     .returning({ id: monitoringJobs.id });
   if (!row) return null;
+  if (!redisConfigured()) {
+    // Scheduled mode: manual refreshes run immediately; scheduled ones wait for `worker:once`.
+    if (opts.inlineFallback) await runRefreshJob(row.id, { attempt: 1, final: true });
+    return row.id;
+  }
   try {
     await getQueue().add("refresh", { jobRowId: row.id }, { jobId: opts.key.replace(/:/g, "_"), priority: opts.priority });
   } catch (e) {

@@ -19,10 +19,10 @@ import { SimulatedBadge } from "../ui/status";
 const ICONS: Record<string, typeof Sparkles> = { competitor_cut: TrendingDown, competitor_raise: TrendingUp, observed_low: TrendingDown, brand_premium: Layers, reference_lost_lead: BarChart3, volatility_up: Waves, unit_economics: Sparkles, competitor_unavailable: CircleSlash, discount_ended: AlertTriangle };
 const KIND_LABEL: Record<string, string> = { competitor_cut: "Competitor move", competitor_raise: "Competitor move", observed_low: "Observed low", brand_premium: "Positioning", reference_lost_lead: "Leadership", volatility_up: "Volatility", unit_economics: "Unit economics", competitor_unavailable: "Availability", discount_ended: "Promotion" };
 
-export function InsightsView({ insights, aiEnabled }: { insights: Insight[]; aiEnabled: boolean }) {
+export function InsightsView({ insights }: { insights: Insight[] }) {
   const [filter, setFilter] = useState<"all" | "competitors" | "positioning" | "availability">("all");
   const [open, setOpen] = useState<string | null>(insights[0]?.id ?? null);
-  const [summary, setSummary] = useState<{ text: string | null; model: string | null; error?: string } | null>(null);
+  const [summary, setSummary] = useState<{ text: string | null; model: string | null; source?: "ai" | "built-in"; error?: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const shown = insights.filter((i) => filter === "all" || (filter === "competitors" && ["competitor_cut", "competitor_raise", "volatility_up", "discount_ended"].includes(i.kind)) || (filter === "positioning" && ["brand_premium", "reference_lost_lead", "unit_economics", "observed_low"].includes(i.kind)) || (filter === "availability" && i.kind === "competitor_unavailable"));
@@ -30,8 +30,8 @@ export function InsightsView({ insights, aiEnabled }: { insights: Insight[]; aiE
   async function explain() {
     setLoading(true);
     try {
-      const r = await api<{ summary: string | null; model: string | null }>("/api/insights/explain", { method: "POST" });
-      setSummary({ text: r.summary, model: r.model });
+      const r = await api<{ summary: string | null; model: string | null; source: "ai" | "built-in" }>("/api/insights/explain", { method: "POST" });
+      setSummary({ text: r.summary, model: r.model, source: r.source });
     } catch (e) {
       setSummary({ text: null, model: null, error: e instanceof ApiError ? e.message : "Couldn't generate a summary." });
     } finally {
@@ -45,11 +45,9 @@ export function InsightsView({ insights, aiEnabled }: { insights: Insight[]; aiE
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         <Segmented ariaLabel="Filter insights" size="sm" value={filter} onChange={setFilter} options={[{ value: "all", label: `All (${insights.length})` }, { value: "competitors", label: "Competitors" }, { value: "positioning", label: "Positioning" }, { value: "availability", label: "Availability" }]} />
-        {aiEnabled && (
-          <Button className="ml-auto" size="sm" variant="tinted" loading={loading} onClick={explain}>
-            <Sparkles className="size-3.5" /> Brief me
-          </Button>
-        )}
+        <Button className="ml-auto" size="sm" variant="tinted" loading={loading} onClick={explain}>
+          <Sparkles className="size-3.5" /> Brief me
+        </Button>
       </div>
 
       <AnimatePresence>
@@ -57,7 +55,7 @@ export function InsightsView({ insights, aiEnabled }: { insights: Insight[]; aiE
           <motion.section initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="card p-5">
             <div className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-accent" /> Morning briefing</div>
             {summary.error ? <p className="mt-2 text-sm text-bad">{summary.error}</p> : <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink">{summary.text ?? "No summary available."}</p>}
-            <p className="mt-3 text-2xs text-ink-3">Written by {summary.model ?? "an AI model"} from the verified findings below only — it isn't given raw data and can't add prices or causes.</p>
+            <p className="mt-3 text-2xs text-ink-3">{summary.source === "ai" ? `Written by ${summary.model ?? "an AI model"} from the verified findings below only — it isn’t given raw data and can’t add prices or causes.` : "Assembled by Aisle from the verified findings below — no external AI service is used."}</p>
           </motion.section>
         )}
       </AnimatePresence>
@@ -115,7 +113,7 @@ export function InsightsView({ insights, aiEnabled }: { insights: Insight[]; aiE
           );
         })}
       </ul>
-      <p className="text-center text-xs text-ink-3">Insights describe what was observed. Aisle doesn't speculate about why a competitor changed a price.</p>
+      <p className="text-center text-xs text-ink-3">Insights describe what was observed. Aisle doesn’t speculate about why a competitor changed a price.</p>
     </div>
   );
 }

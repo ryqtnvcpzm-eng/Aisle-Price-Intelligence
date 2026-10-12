@@ -25,6 +25,7 @@ for (const size of sizes) {
     await page.waitForURL((u) => !u.pathname.startsWith("/sign-in"), { timeout: 30000 });
     for (const r of routes) {
       await page.goto(`${BASE}${r}`, { waitUntil: "networkidle" });
+      await page.mouse.move(0, 0);
       await page.waitForTimeout(900);
       const name = `${r === "/" ? "overview" : r.replace(/^\//, "").replace(/[/?=&]/g, "_")}-${size}-${theme}.png`;
       await page.screenshot({ path: `${out}/${name}`, fullPage: process.env.FULL === "1" });

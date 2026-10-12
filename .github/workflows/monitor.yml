@@ -1,0 +1,42 @@
+# Free hourly monitoring for hosts without a long-running worker (e.g. Vercel + Neon).
+# Add repository secrets: DATABASE_URL, BETTER_AUTH_SECRET, BETTER_AUTH_URL and any
+# optional free provider keys (CREATORS_API_*, RESEND_API_KEY). Leave REDIS_URL unset.
+name: Hourly monitoring
+
+on:
+  schedule:
+    - cron: "7 * * * *" # every hour at :07 (GitHub may delay scheduled runs)
+  workflow_dispatch:
+
+concurrency:
+  group: monitoring
+  cancel-in-progress: false
+
+jobs:
+  run:
+    if: ${{ vars.AISLE_SCHEDULED_MONITORING == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+      CREATORS_API_CREDENTIAL_ID: ${{ secrets.CREATORS_API_CREDENTIAL_ID }}
+      CREATORS_API_CREDENTIAL_SECRET: ${{ secrets.CREATORS_API_CREDENTIAL_SECRET }}
+      CREATORS_API_CREDENTIAL_VERSION: ${{ secrets.CREATORS_API_CREDENTIAL_VERSION }}
+      CREATORS_API_PARTNER_TAG: ${{ secrets.CREATORS_API_PARTNER_TAG }}
+      CREATORS_API_LICENSE_ACK: ${{ vars.CREATORS_API_LICENSE_ACK }}
+      OBSERVATION_RETENTION_DAYS: ${{ vars.OBSERVATION_RETENTION_DAYS }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
+      NODE_ENV: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - name: Refresh due listings (+ daily tasks at 03:07 UTC)
+        run: |
+          if [ "$(date -u +%H)" = "03" ]; then pnpm worker:once --daily; else pnpm worker:once; fi

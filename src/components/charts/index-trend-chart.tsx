@@ -16,7 +16,7 @@ function endLabel(n: number, text: string, strong: boolean) {
     if (props.index !== n - 1 || props.x === undefined || props.y === undefined) return null;
     return (
       <text x={Number(props.x) + 8} y={Number(props.y) + 4} fontSize={11} fontWeight={strong ? 600 : 400} fill={strong ? "var(--ink)" : "var(--ink-2)"}>
-        {text}
+        {text.length > 18 ? `${text.slice(0, 17)}…` : text}
       </text>
     );
   }
@@ -41,7 +41,7 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
   return (
     <div style={{ height }} className="relative" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 76, bottom: 0, left: -12 }}>
+        <LineChart data={data} margin={{ top: 8, right: Math.min(132, Math.max(80, 14 + Math.min(referenceLabel.length, 18) * 6.6)), bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tickFormatter={fmtDate} tickLine={false} axisLine={false} minTickGap={48} tickMargin={8} />
           <YAxis domain={[lo, hi]} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${v}`} tickCount={4} />

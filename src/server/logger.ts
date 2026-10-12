@@ -27,7 +27,7 @@ export const logger = pino({
   },
 });
 
-/** Strip query strings that may carry API keys (Keepa uses ?key=) from URLs before logging. */
+/** Strip query strings that may carry API keys (e.g. ?key=…) from URLs before logging. */
 export function safeUrl(url: string): string {
   try {
     const u = new URL(url);

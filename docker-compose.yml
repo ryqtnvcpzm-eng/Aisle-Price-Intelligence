@@ -1,0 +1,43 @@
+# Local infrastructure for development: `docker compose up -d`
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: aisle
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+
+  # Optional: run the whole stack in containers (`docker compose --profile app up --build`).
+  web:
+    profiles: [app]
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/aisle
+      REDIS_URL: redis://redis:6379
+    ports: ["3000:3000"]
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_started } }
+  worker:
+    profiles: [app]
+    build: .
+    command: ["pnpm", "worker"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/aisle
+      REDIS_URL: redis://redis:6379
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_started } }
+
+volumes:
+  pgdata:
+  redisdata:

@@ -59,3 +59,14 @@ export function relativeTime(d: Date | string | number | null | undefined, now =
   if (abs < 30 * 86_400_000) return fmt(Math.round(abs / 86_400_000), "d");
   return new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
+
+/**
+ * Is background monitoring alive? The queue worker beats every 30 s; the
+ * scheduled runner (`worker:once`, e.g. an hourly GitHub Actions cron) only
+ * beats when it runs, and hosted crons can start late — allow two hours.
+ */
+export function workerAlive(hb: { at: string; mode?: "queue" | "scheduled" } | null | undefined, now: number): boolean {
+  if (!hb) return false;
+  const age = now - new Date(hb.at).getTime();
+  return age < (hb.mode === "scheduled" ? 2 * 3600_000 : 120_000);
+}

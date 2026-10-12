@@ -698,3 +698,10 @@ export type ProductFamily = typeof productFamilies.$inferSelect;
 export type ComparisonGroup = typeof comparisonGroups.$inferSelect;
 export type AlertRule = typeof alertRules.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
+
+/** Short-lived key/value cache used when Redis isn't configured (e.g. serverless free tiers). */
+export const cacheEntries = pgTable("cache_entries", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  expiresAt: ts("expires_at").notNull(),
+});

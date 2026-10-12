@@ -142,7 +142,8 @@ export function parseProductInput(raw: string, defaultMarketplace: MarketplaceCo
 
   const marketplace = host === "amzn.com" || host === "www.amzn.com" ? "US" : marketplaceForHost(host);
   if (!marketplace) {
-    if (/(^|\.)amazon\.[a-z.]+$/.test(host)) return err(input, "unsupported_marketplace");
+    // A real-looking Amazon storefront we don't list yet (amazon.cn, amazon.eg …) — not look-alikes like amazon.in.evil.com.
+    if (/^(www\.|m\.)?amazon\.(com?\.)?[a-z]{2,3}$/.test(host)) return err(input, "unsupported_marketplace");
     return err(input, "unsupported_host");
   }
 

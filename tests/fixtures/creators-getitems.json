@@ -1,0 +1,114 @@
+{
+ "_comment": "Synthetic fixture in the shape of a Creators API getItems response (field names per Amazon's Creators API SDK models). Values are fictional.",
+ "itemsResult": {
+  "items": [
+   {
+    "asin": "B0CXJ8QZ7M",
+    "parentASIN": "B0CXJ8PAR1",
+    "detailPageURL": "https://www.amazon.in/dp/B0CXJ8QZ7M?tag=example-21",
+    "images": {
+     "primary": {
+      "large": {
+       "url": "https://m.media-amazon.com/images/I/61exampleA._SL500_.jpg",
+       "height": 500,
+       "width": 500
+      }
+     }
+    },
+    "itemInfo": {
+     "title": {
+      "displayValue": "Example Nutrition Plant Protein, Chocolate, 1 kg"
+     },
+     "byLineInfo": {
+      "brand": {
+       "displayValue": "Example Nutrition"
+      }
+     },
+     "classifications": {
+      "productGroup": {
+       "displayValue": "Health and Beauty"
+      }
+     },
+     "productInfo": {
+      "size": {
+       "displayValue": "1 kg"
+      }
+     }
+    },
+    "variationAttributes": [
+     {
+      "name": "size_name",
+      "value": "1 kg"
+     },
+     {
+      "name": "flavor_name",
+      "value": "Chocolate"
+     }
+    ],
+    "offersV2": {
+     "listings": [
+      {
+       "isBuyBoxWinner": true,
+       "type": "",
+       "price": {
+        "money": {
+         "amount": 2099.0,
+         "currency": "INR",
+         "displayAmount": "₹2,099.00"
+        },
+        "savingBasis": {
+         "money": {
+          "amount": 2799.0,
+          "currency": "INR",
+          "displayAmount": "₹2,799.00"
+         },
+         "savingBasisType": "LIST_PRICE"
+        }
+       },
+       "availability": {
+        "type": "IN_STOCK",
+        "message": "In stock"
+       },
+       "condition": {
+        "value": "New"
+       },
+       "merchantInfo": {
+        "id": "A1EXAMPLESELLER",
+        "name": "Example Retail"
+       }
+      }
+     ]
+    }
+   },
+   {
+    "asin": "B0CXJ8QZ9P",
+    "itemInfo": {
+     "title": {
+      "displayValue": "Example Nutrition Plant Protein, Vanilla, 1 kg"
+     }
+    },
+    "offersV2": {
+     "listings": [
+      {
+       "isBuyBoxWinner": true,
+       "price": {
+        "money": {
+         "amount": 1999.5,
+         "currency": "INR"
+        }
+       },
+       "availability": {
+        "type": "OUT_OF_STOCK"
+       },
+       "merchantInfo": {
+        "id": "AT95IG9ONZD7S",
+        "name": "Amazon.in"
+       }
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "errors": []
+}

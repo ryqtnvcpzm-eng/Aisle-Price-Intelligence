@@ -98,7 +98,7 @@ export function Sidebar() {
           {!collapsed && app.dataMode === "demo" && (
             <motion.div key="demo" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} transition={spring.layout} className="overflow-hidden">
               <Link href="/settings#providers" className="block rounded-[10px] bg-sim-soft px-3 py-2.5 text-xs leading-snug text-ink-2 outline-none transition-opacity hover:opacity-90">
-                <span className="font-semibold text-sim">Demo mode.</span> Prices are simulated from a fictional catalog. Connect Keepa for live data.
+                <span className="font-semibold text-sim">Demo mode.</span> Prices are simulated from a fictional catalog. Connect the free Amazon Creators API for live data.
               </Link>
             </motion.div>
           )}

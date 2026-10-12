@@ -1,0 +1,35 @@
+# One-click database setup for hosted deployments (e.g. Neon). Run it from the
+# Actions tab → "Set up database" → Run workflow. Uses the DATABASE_URL secret.
+name: Set up database
+
+on:
+  workflow_dispatch:
+    inputs:
+      seed_demo:
+        description: "Also create the demo workspace (demo@aisle.app, simulated data)"
+        type: boolean
+        default: true
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+      BETTER_AUTH_URL: ${{ secrets.BETTER_AUTH_URL }}
+      DATA_PROVIDER: demo
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::Add the DATABASE_URL repository secret first (Settings → Secrets and variables → Actions)."; exit 1; fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations
+        run: pnpm db:migrate
+      - name: Seed demo workspace
+        if: ${{ inputs.seed_demo }}
+        run: pnpm db:seed

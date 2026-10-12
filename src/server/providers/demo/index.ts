@@ -165,7 +165,7 @@ export class DemoProvider implements DataProvider {
   private familyFor(r: Resolved): VariationFamily {
     const f = r.family;
     if (!f) {
-      return { parentAsin: null, dimensions: [], children: [{ asin: r.variant.asin, attributes: {} }], completeness: "unavailable", note: "Demo mode can't look up real Amazon listings, so variations can't be discovered. Connect Keepa for live data.", reportedTotal: null };
+      return { parentAsin: null, dimensions: [], children: [{ asin: r.variant.asin, attributes: {} }], completeness: "unavailable", note: "Demo mode can't look up real Amazon listings, so variations can't be discovered. Connect the free Amazon Creators API for live data.", reportedTotal: null };
     }
     if (f.variants.length === 1 && !f.parentAsin) {
       return { parentAsin: null, dimensions: [], children: [{ asin: f.variants[0]!.asin, attributes: {} }], completeness: "single", note: "This listing has no variations (simulated).", reportedTotal: 1 };
