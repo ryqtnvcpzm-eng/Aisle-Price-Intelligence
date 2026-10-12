@@ -13,6 +13,7 @@ import { relativeTime } from "@/lib/freshness";
 import { getMarketplace, isMarketplaceCode, MARKETPLACES, PRIMARY_MARKETPLACES, listingUrl, type MarketplaceCode } from "@/lib/marketplaces";
 import { formatMoney } from "@/lib/money";
 import { formatQuantity, NORMALIZATION_BASES, type NormalizationBasis } from "@/lib/quantity";
+import { AutoHeight } from "../motion/auto-height";
 import { duration, ease, spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -163,8 +164,12 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
         {/* Header */}
         <div className="flex items-start gap-3 px-6 pb-4 pt-5">
           <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-semibold tracking-tight">{phase === "done" ? "You're all set" : "Add products"}</h2>
-            <p className="mt-0.5 text-sm text-ink-2">{phase === "done" ? "Aisle will keep these prices fresh in the background." : "Paste Amazon links or ASINs — one or many. We'll find every variant."}</p>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={phase === "done" ? "done" : "add"} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={spring.snappy}>
+                <h2 className="text-xl font-semibold tracking-tight">{phase === "done" ? "You’re all set" : "Add products"}</h2>
+                <p className="mt-0.5 text-sm text-ink-2">{phase === "done" ? "Aisle will keep these prices fresh in the background." : "Paste Amazon links or ASINs — one or many. We’ll find every variant."}</p>
+              </motion.div>
+            </AnimatePresence>
           </div>
           <button onClick={() => onOpenChange(false)} className="flex size-8 shrink-0 items-center justify-center rounded-full text-ink-3 transition-colors hover:bg-[var(--hairline)] hover:text-ink" aria-label="Close">
             <X className="size-4" />
@@ -172,9 +177,11 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2">
-          <AnimatePresence mode="popLayout" initial={false}>
+          {/* Phases swap sequentially (never two at once) while the sheet's height springs to fit. */}
+          <AutoHeight>
+          <AnimatePresence mode="wait" initial={false}>
             {(phase === "input" || phase === "loading") && (
-              <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: duration.micro } }} className="space-y-3">
+              <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} className="space-y-3">
                 <div className="relative">
                   <div className={cn("rounded-[14px] bg-surface-2 shadow-[inset_0_0_0_0.5px_var(--line-strong)] transition-shadow focus-within:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_4px_var(--accent-soft)]", phase === "loading" && "opacity-70")}>
                     <div className="flex items-start gap-3 px-3.5 pt-3">
@@ -302,7 +309,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
             )}
 
             {(phase === "preview" || phase === "saving") && preview && (
-              <motion.div key="preview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={spring.panel} className="space-y-4">
+              <motion.div key="preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={spring.panel} className="space-y-4">
                 <LayoutGroup>
                   {preview.families.map((f, fi) => (
                     <FamilyPreview
@@ -387,6 +394,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
               </motion.div>
             )}
           </AnimatePresence>
+          </AutoHeight>
         </div>
 
         {/* Footer */}

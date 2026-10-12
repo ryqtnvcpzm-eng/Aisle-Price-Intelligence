@@ -32,7 +32,7 @@ export function Dialog({ open, onOpenChange, title, description, children, class
               }}
             >
               <motion.div
-                initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                initial={{ opacity: 0, y: 18, scale: 0.985 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.985, transition: { duration: duration.control, ease: ease.in } }}
                 transition={spring.panel}

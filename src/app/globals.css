@@ -312,6 +312,13 @@
     backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     box-shadow: var(--shadow-pop), inset 0 0.5px 0 var(--glass-edge);
   }
+  /* Thick glass for text-dense floating surfaces (command palette): legible over colourful content. */
+  .material-thick {
+    background: var(--glass-strong);
+    -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(190%);
+    backdrop-filter: blur(calc(var(--glass-blur) * 1.4)) saturate(190%);
+    box-shadow: var(--shadow-pop), inset 0 0.5px 0 var(--glass-edge);
+  }
   .material-strong {
     background: var(--glass-strong);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
@@ -413,6 +420,23 @@
 }
 
 /* View transitions (React <ViewTransition>): product image morph library → detail. */
+/* The page behind the morph crossfades quickly so the destination arrives with the image. */
+::view-transition-old(root) {
+  animation: 140ms cubic-bezier(0.4, 0, 1, 1) both vt-fade-out;
+}
+::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0.22, 1, 0.36, 1) both vt-fade-in;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-fade-in {
+  from {
+    opacity: 0;
+  }
+}
 ::view-transition-group(.morph) {
   animation-duration: 420ms;
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
@@ -429,6 +453,110 @@
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/*
+ * Chart reveal: lines draw in left→right with a paint-only clip-path sweep.
+ * Recharts' own animation re-renders every path through React on each frame
+ * (measured: an 826 ms main-thread block on the comparison timeline); this
+ * costs nothing on the main thread and plays once, when a series mounts.
+ */
+@keyframes chart-sweep {
+  from {
+    clip-path: inset(-8px 100% -8px 0);
+  }
+  to {
+    clip-path: inset(-8px -8px -8px 0);
+  }
+}
+@keyframes chart-label-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+}
+.chart-reveal .recharts-line-curve {
+  animation: chart-sweep 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.chart-reveal .chart-end-label {
+  animation: chart-label-in 260ms cubic-bezier(0.22, 1, 0.36, 1) 520ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-reveal .recharts-line-curve,
+  .chart-reveal .chart-end-label {
+    animation: none;
+  }
+}
+
+/*
+ * Bar reveal: bars grow from their zero line with a compositor transform
+ * (scaleX on the fill box) instead of Recharts' per-frame JS re-render.
+ * Negative bars grow leftward from the axis; rows stagger by 18 ms.
+ */
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0.001);
+  }
+}
+.bars-reveal .recharts-rectangle.bar-pos,
+.bars-reveal .recharts-rectangle.bar-neg {
+  transform-box: fill-box;
+  transform-origin: left center;
+  animation: bar-grow 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.bars-reveal .recharts-rectangle.bar-neg {
+  transform-origin: right center;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(2) .recharts-rectangle {
+  animation-delay: 18ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(3) .recharts-rectangle {
+  animation-delay: 36ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(4) .recharts-rectangle {
+  animation-delay: 54ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(5) .recharts-rectangle {
+  animation-delay: 72ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(6) .recharts-rectangle {
+  animation-delay: 90ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(7) .recharts-rectangle {
+  animation-delay: 108ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(8) .recharts-rectangle {
+  animation-delay: 126ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(9) .recharts-rectangle {
+  animation-delay: 144ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(10) .recharts-rectangle {
+  animation-delay: 162ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(11) .recharts-rectangle {
+  animation-delay: 180ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(12) .recharts-rectangle {
+  animation-delay: 198ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(13) .recharts-rectangle {
+  animation-delay: 216ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(14) .recharts-rectangle {
+  animation-delay: 234ms;
+}
+.bars-reveal .recharts-bar-rectangle:nth-child(15) .recharts-rectangle {
+  animation-delay: 252ms;
+}
+.bars-reveal .recharts-label-list {
+  animation: chart-label-in 240ms cubic-bezier(0.22, 1, 0.36, 1) 360ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bars-reveal .recharts-rectangle,
+  .bars-reveal .recharts-label-list {
     animation: none !important;
   }
 }

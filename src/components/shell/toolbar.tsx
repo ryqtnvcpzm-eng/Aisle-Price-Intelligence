@@ -113,7 +113,8 @@ function MonitoringIndicator() {
       trigger={
         <button className="flex h-8 items-center gap-2 rounded-[9px] px-2 text-xs text-ink-2 outline-none transition-colors hover:bg-[var(--hairline)]" aria-label="Monitoring status">
           <span className="relative flex size-2">
-            {alive && <span className="absolute inline-flex h-full w-full rounded-full bg-good opacity-60 motion-safe:animate-ping [animation-duration:2.4s]" />}
+            {/* One calm pulse when a new refresh lands — not a perpetual ping. Keyed by the latest job. */}
+            {alive && <motion.span key={last?.createdAt ?? "none"} className="absolute inline-flex h-full w-full rounded-full bg-good" initial={{ scale: 1, opacity: 0.55 }} animate={{ scale: 2.6, opacity: 0 }} transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />}
             <span className={cn("relative inline-flex size-2 rounded-full", alive ? "bg-good" : data ? "bg-warn" : "bg-ink-4")} />
           </span>
           <span className="hidden xl:inline">{last ? `Refreshed ${relativeTime(last.createdAt)}` : "Monitoring"}</span>

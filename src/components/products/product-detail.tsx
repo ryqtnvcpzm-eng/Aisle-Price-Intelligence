@@ -171,7 +171,7 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
             <ProductImage src={f.imageUrl} alt={f.title} size={148} rounded={24} className="shadow-[var(--shadow-md)]" />
           </div>
         </ViewTransition>
-        <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: 0.08 }} className="min-w-0 flex-1">
+        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={spring.snappy} className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link href={`/brands?brand=${encodeURIComponent(f.brandName ?? "")}`} className="font-medium text-ink-2 hover:text-accent">{f.brandName ?? "Unbranded"}</Link>
             {f.isReference && <Badge tone="accent" size="xs">Reference brand</Badge>}

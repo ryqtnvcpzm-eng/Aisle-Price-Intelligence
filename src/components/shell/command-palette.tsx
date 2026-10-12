@@ -128,6 +128,47 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const item = "flex h-10 cursor-default select-none items-center gap-3 rounded-[10px] px-3 text-sm text-ink outline-none data-[selected=true]:bg-accent data-[selected=true]:text-white [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-ink-3 data-[selected=true]:[&_svg]:text-white/90";
   const heading = "[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:text-2xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-ink-3";
 
+  // Search results; rendered above Actions while typing, below everything for an empty query.
+  const results = (
+    <>
+                      {data?.products.length ? (
+        <Command.Group heading="Products">
+          {data.products.map((p) => (
+            <Command.Item key={p.id} value={`product-${p.id}`} className={cn(item, "h-12")} onSelect={() => go(`/products/${p.id}`, p.title)}>
+              <ProductImage src={p.imageUrl} alt="" size={30} rounded={7} />
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium">{p.brand ? `${p.brand} · ` : ""}</span>
+                {p.title}
+              </span>
+              <span className="flex items-center gap-2 text-xs opacity-70">
+                {p.variants} var.
+                <MarketplaceTag code={p.marketplace} className="text-inherit" />
+              </span>
+            </Command.Item>
+          ))}
+        </Command.Group>
+      ) : null}
+      {data?.groups.length ? (
+        <Command.Group heading="Comparisons">
+          {data.groups.map((g) => (
+            <Command.Item key={g.id} value={`group-${g.id}`} className={item} onSelect={() => go(`/comparisons/${g.id}`, g.name)}>
+              <BarChart3 /> <span className="flex-1">{g.name}</span> <span className="text-xs opacity-70">{g.items} listings</span>
+            </Command.Item>
+          ))}
+        </Command.Group>
+      ) : null}
+      {data?.brands.length ? (
+        <Command.Group heading="Brands">
+          {data.brands.map((b) => (
+            <Command.Item key={b} value={`brand-${b}`} className={item} onSelect={() => go(`/brands?brand=${encodeURIComponent(b)}`, b)}>
+              <Tag /> {b}
+            </Command.Item>
+          ))}
+        </Command.Group>
+      ) : null}
+    </>
+  );
+
   return (
     <Ctx.Provider value={ctx}>
       {children}
@@ -144,7 +185,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.98, transition: { duration: duration.micro } }}
                   transition={spring.popover}
-                  className="material fixed left-1/2 top-[12vh] z-[91] w-[min(640px,calc(100vw-24px))] -translate-x-1/2 overflow-hidden rounded-[18px] outline-none"
+                  className="material-thick fixed left-1/2 top-[12vh] z-[91] w-[min(640px,calc(100vw-24px))] -translate-x-1/2 overflow-hidden rounded-[18px] outline-none"
                 >
                   <RD.Title className="sr-only">Command palette</RD.Title>
                   <Command label="Command palette" shouldFilter={false} loop className="flex max-h-[min(560px,70vh)] flex-col">
@@ -182,41 +223,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                         ))}
                       </Command.Group>
                       )}
-                      {data?.products.length ? (
-                        <Command.Group heading="Products">
-                          {data.products.map((p) => (
-                            <Command.Item key={p.id} value={`product-${p.id}`} className={cn(item, "h-12")} onSelect={() => go(`/products/${p.id}`, p.title)}>
-                              <ProductImage src={p.imageUrl} alt="" size={30} rounded={7} />
-                              <span className="min-w-0 flex-1 truncate">
-                                <span className="font-medium">{p.brand ? `${p.brand} · ` : ""}</span>
-                                {p.title}
-                              </span>
-                              <span className="flex items-center gap-2 text-xs opacity-70">
-                                {p.variants} var.
-                                <MarketplaceTag code={p.marketplace} className="text-inherit" />
-                              </span>
-                            </Command.Item>
-                          ))}
-                        </Command.Group>
-                      ) : null}
-                      {data?.groups.length ? (
-                        <Command.Group heading="Comparisons">
-                          {data.groups.map((g) => (
-                            <Command.Item key={g.id} value={`group-${g.id}`} className={item} onSelect={() => go(`/comparisons/${g.id}`, g.name)}>
-                              <BarChart3 /> <span className="flex-1">{g.name}</span> <span className="text-xs opacity-70">{g.items} listings</span>
-                            </Command.Item>
-                          ))}
-                        </Command.Group>
-                      ) : null}
-                      {data?.brands.length ? (
-                        <Command.Group heading="Brands">
-                          {data.brands.map((b) => (
-                            <Command.Item key={b} value={`brand-${b}`} className={item} onSelect={() => go(`/brands?brand=${encodeURIComponent(b)}`, b)}>
-                              <Tag /> {b}
-                            </Command.Item>
-                          ))}
-                        </Command.Group>
-                      ) : null}
+                      {query && results}
                       <Command.Group heading="Actions">
                         {[
                           { id: "add", label: "Add product", icon: <Plus />, k: "N", fn: () => importer.open() },
@@ -254,6 +261,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                         ))}
                       </Command.Group>
                       )}
+                      {/* Empty query: suggestions go last so late-arriving data appends instead of shifting the list. */}
+                      {!query && results}
                     </Command.List>
                     <div className="flex items-center gap-4 px-4 py-2.5 text-2xs text-ink-3 hairline-t">
                       <span className="flex items-center gap-1"><Kbd>↑</Kbd><Kbd>↓</Kbd> navigate</span>

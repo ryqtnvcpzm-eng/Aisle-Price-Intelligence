@@ -24,21 +24,33 @@ export const ease = {
   in: [0.4, 0, 1, 1] as const,
 };
 
+/**
+ * Opacity never rides a spring: a spring lets it crawl (a dialog stays
+ * see-through for ~300 ms and the page ghosts through it). Every spring below
+ * moves geometry physically while opacity resolves with this short tween.
+ * Motion inherits the parent `delay` into per-value transitions, so staggers
+ * still apply to the fade.
+ */
+const fade = { type: "tween", duration: 0.18, ease: [0.22, 1, 0.36, 1] } as const;
+
 /** Springs: stiffness/damping/mass. Critically-damped-ish unless noted. */
 export const spring = {
   /** Toggles, segmented pills, tab indicators — crisp, no overshoot. */
-  snappy: { type: "spring", stiffness: 520, damping: 38, mass: 0.8 },
+  snappy: { type: "spring", stiffness: 520, damping: 38, mass: 0.8, opacity: fade },
   /** Buttons and tactile press feedback. */
-  press: { type: "spring", stiffness: 700, damping: 34, mass: 0.6 },
+  press: { type: "spring", stiffness: 700, damping: 34, mass: 0.6, opacity: fade },
   /** Menus, popovers, palettes — quick with a whisper of settle. */
-  popover: { type: "spring", stiffness: 440, damping: 32, mass: 0.9 },
+  popover: { type: "spring", stiffness: 440, damping: 32, mass: 0.9, opacity: { ...fade, duration: 0.14 } },
   /** Sheets, drawers, dialogs. */
-  panel: { type: "spring", stiffness: 300, damping: 32, mass: 1 },
+  panel: { type: "spring", stiffness: 300, damping: 32, mass: 1, opacity: fade },
   /** Shared-element / layout moves (cards → detail, reorders). */
-  layout: { type: "spring", stiffness: 340, damping: 34, mass: 1 },
+  layout: { type: "spring", stiffness: 340, damping: 34, mass: 1, opacity: fade },
   /** Gentle — numbers, list settling. */
-  gentle: { type: "spring", stiffness: 180, damping: 26, mass: 1 },
+  gentle: { type: "spring", stiffness: 180, damping: 26, mass: 1, opacity: { ...fade, duration: 0.24 } },
 } as const satisfies Record<string, Transition>;
+
+/** A plain fade for content swaps in place. */
+export const fadeTween = fade;
 
 export const stagger = {
   list: 0.035,

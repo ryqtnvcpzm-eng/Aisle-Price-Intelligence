@@ -180,7 +180,7 @@ export function ComparisonWorkspace({ detail, brands }: { detail: Detail; brands
       </div>
 
       <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={`${view}-${arranging}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <motion.div key={`${view}-${arranging}`} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.08 } }} transition={spring.snappy}>
           {view === "table" && !arranging && <CompareTable result={result} items={items} unitLabel={unitLabel} colorFor={colorFor} onRole={(it, role) => patchItem(it.itemId, { role })} onConfirm={(it) => patchItem(it.itemId, { status: "confirmed" }).then(() => toast.success("Confirmed — now included in calculations"))} onRemove={(ids) => removeItems(ids)} />}
           {view === "table" && arranging && <Arrange groupId={group.id} items={items} />}
           {view === "visual" && <ComparisonVisual result={result} items={items} colorFor={colorFor} unitLabel={unitLabel} />}

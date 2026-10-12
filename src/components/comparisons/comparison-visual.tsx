@@ -1,6 +1,5 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { formatMoney, formatPct, pctChange } from "@/lib/money";
 import type { ComparisonResult } from "@/lib/comparison";
@@ -20,7 +19,6 @@ interface Props {
  * Every bar is direct-labelled so identity never relies on color.
  */
 export function ComparisonVisual({ result, items, colorFor, unitLabel }: Props) {
-  const reduce = useReducedMotion();
   const cur = result.currency ?? "INR";
   const comp = result.rows.filter((r) => r.comparable).sort((a, b) => a.unitPriceMinor! - b.unitPriceMinor!);
   const data = comp.map((r) => ({ id: r.id, name: `${r.brandName ?? ""} · ${r.label}`, brand: r.brandName, unit: r.unitPriceMinor!, premium: r.premium, role: r.role, ch7: pctChange(items.find((i) => i.variantId === r.id)?.p7 ?? null, r.priceMinor) }));
@@ -29,11 +27,12 @@ export function ComparisonVisual({ result, items, colorFor, unitLabel }: Props) 
 
   if (data.length < 2) return <p className="py-16 text-center text-sm text-ink-3">Visual comparisons need at least two comparable listings.</p>;
 
-  const barCommon = { isAnimationActive: !reduce, animationDuration: 550, animationEasing: "ease-out" as const };
+  // Bars grow via the paint-only .bars-reveal CSS (globals.css); Recharts renders them once.
+  const barCommon = { isAnimationActive: false };
   const tip = (title: string, rows: { label: string; value: string; color: string }[]) => <ChartTooltip title={title} rows={rows.map((r, i) => ({ key: String(i), ...r }))} />;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-2">
+    <div className="bars-reveal grid gap-6 xl:grid-cols-2">
       <section className="card p-5">
         <SectionHeader title={`Unit price ${unitLabel}`} description="Ranked cheapest first. Dashed line = competitor median." />
         <div className="mt-4" style={{ height: h }}>
@@ -45,7 +44,7 @@ export function ComparisonVisual({ result, items, colorFor, unitLabel }: Props) 
               {median !== null && <ReferenceLine x={median} stroke="var(--ink-3)" strokeDasharray="4 3" label={{ value: "median", position: "top", fill: "var(--ink-3)", fontSize: 10 }} />}
               <Tooltip cursor={{ fill: "var(--hairline)" }} isAnimationActive={false} content={({ active, payload }) => (active && payload?.[0] ? tip(String(payload[0].payload.name), [{ label: unitLabel, value: formatMoney(payload[0].payload.unit, cur, undefined, { trimZeros: false }), color: colorFor(payload[0].payload.brand) }, { label: "vs competitor median", value: formatPct(payload[0].payload.premium, { signed: true }), color: "var(--ink-4)" }]) : null)} />
               <Bar dataKey="unit" radius={[0, 4, 4, 0]} {...barCommon}>
-                {data.map((d) => <Cell key={d.id} fill={colorFor(d.brand)} fillOpacity={d.role === "reference" ? 1 : 0.82} />)}
+                {data.map((d) => <Cell key={d.id} fill={colorFor(d.brand)} fillOpacity={d.role === "reference" ? 1 : 0.82} className="bar-pos" />)}
                 <LabelList dataKey="unit" position="right" formatter={(v) => formatMoney(Number(v), cur, undefined, { trimZeros: false })} style={{ fontSize: 11, fill: "var(--ink-2)", fontVariantNumeric: "tabular-nums" }} />
               </Bar>
             </BarChart>
@@ -64,7 +63,7 @@ export function ComparisonVisual({ result, items, colorFor, unitLabel }: Props) 
               <ReferenceLine x={0} stroke="var(--chart-axis)" />
               <Tooltip cursor={{ fill: "var(--hairline)" }} isAnimationActive={false} content={({ active, payload }) => (active && payload?.[0] ? tip(String(payload[0].payload.name), [{ label: "vs median", value: formatPct(payload[0].payload.premium, { signed: true }), color: "var(--ink-3)" }]) : null)} />
               <Bar dataKey="p" radius={4} {...barCommon}>
-                {data.map((d) => <Cell key={d.id} fill={(d.premium ?? 0) >= 0 ? "var(--up)" : "var(--down)"} fillOpacity={0.85} />)}
+                {data.map((d) => <Cell key={d.id} fill={(d.premium ?? 0) >= 0 ? "var(--up)" : "var(--down)"} fillOpacity={0.85} className={(d.premium ?? 0) >= 0 ? "bar-pos" : "bar-neg"} />)}
                 <LabelList dataKey="p" position="right" formatter={(v) => `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(Math.abs(Number(v)) < 10 ? 1 : 0)}%`} style={{ fontSize: 11, fill: "var(--ink-2)" }} />
               </Bar>
             </BarChart>
@@ -87,7 +86,7 @@ export function ComparisonVisual({ result, items, colorFor, unitLabel }: Props) 
               <YAxis type="category" dataKey="name" width={170} tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
               <ReferenceLine x={0} stroke="var(--chart-axis)" />
               <Bar dataKey="c" radius={4} {...barCommon}>
-                {data.map((d) => <Cell key={d.id} fill={(d.ch7 ?? 0) >= 0 ? "var(--up)" : "var(--down)"} fillOpacity={0.85} />)}
+                {data.map((d) => <Cell key={d.id} fill={(d.ch7 ?? 0) >= 0 ? "var(--up)" : "var(--down)"} fillOpacity={0.85} className={(d.ch7 ?? 0) >= 0 ? "bar-pos" : "bar-neg"} />)}
                 <LabelList dataKey="c" position="right" formatter={(v) => (v === null || v === undefined ? "n/a" : `${Number(v) > 0 ? "+" : ""}${Number(v).toFixed(1)}%`)} style={{ fontSize: 11, fill: "var(--ink-2)" }} />
               </Bar>
             </BarChart>

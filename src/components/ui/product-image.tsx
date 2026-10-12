@@ -5,7 +5,8 @@ import { Package } from "lucide-react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 
-type Status = "ssr" | "loading" | "loaded" | "error";
+/** ssr: server-rendered, visible without JS · cached: complete at mount, shown without a fade. */
+type Status = "ssr" | "cached" | "loading" | "loaded" | "error";
 
 const noopSubscribe = () => () => {};
 /** True while rendering on the server or hydrating server markup; false for client-created elements. */
@@ -34,15 +35,18 @@ export function ProductImage({ src, alt, size = 40, className, layoutId, rounded
 
   // Functional update: a late callback for an older source finds a different `s.src` and is ignored.
   const settle = useCallback((forSrc: string | null | undefined, next: Status) => {
-    setState((s) => (s.src === forSrc && s.status !== next && !(s.status === "ssr" && next === "loaded") ? { src: forSrc, status: next } : s));
+    setState((s) => (s.src === forSrc && s.status !== next && !((s.status === "ssr" || s.status === "cached") && next === "loaded") ? { src: forSrc, status: next } : s));
   }, []);
 
   const attach = useCallback(
     (img: HTMLImageElement | null) => {
       if (!img || !img.complete) return;
-      // Complete before handlers could observe it: decode() resolves for usable images, rejects for broken ones.
+      // Already decoded (cache hit): settle synchronously — ref callbacks run at commit, before paint,
+      // so a cached image never flashes its loading skeleton.
+      if (img.naturalWidth > 0) return settle(src, "cached");
+      // naturalWidth 0 is ambiguous (broken, or an SVG without intrinsic size): decode() decides.
       if (typeof img.decode === "function") img.decode().then(() => settle(src, "loaded"), () => settle(src, "error"));
-      else settle(src, img.naturalWidth > 0 ? "loaded" : "error");
+      else settle(src, "error");
     },
     [settle, src],
   );
@@ -62,7 +66,7 @@ export function ProductImage({ src, alt, size = 40, className, layoutId, rounded
           decoding="async"
           onLoad={() => settle(src, "loaded")}
           onError={() => settle(src, "error")}
-          className={cn("relative h-full w-full object-contain", status === "ssr" ? "opacity-100" : "transition-opacity duration-300 ease-out", status === "loaded" && "opacity-100", status === "loading" && "opacity-0")}
+          className={cn("relative h-full w-full object-contain", status === "ssr" || status === "cached" ? "opacity-100" : "transition-opacity duration-300 ease-out", status === "loaded" && "opacity-100", status === "loading" && "opacity-0")}
           referrerPolicy="no-referrer"
         />
       ) : (

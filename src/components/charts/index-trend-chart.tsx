@@ -1,6 +1,5 @@
 "use client";
 
-import { useReducedMotion } from "motion/react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 
@@ -15,7 +14,7 @@ function endLabel(n: number, text: string, strong: boolean) {
   function EndLabel(props: { x?: number | string; y?: number | string; index?: number }) {
     if (props.index !== n - 1 || props.x === undefined || props.y === undefined) return null;
     return (
-      <text x={Number(props.x) + 8} y={Number(props.y) + 4} fontSize={11} fontWeight={strong ? 600 : 400} fill={strong ? "var(--ink)" : "var(--ink-2)"}>
+      <text className="chart-end-label" x={Number(props.x) + 8} y={Number(props.y) + 4} fontSize={11} fontWeight={strong ? 600 : 400} fill={strong ? "var(--ink)" : "var(--ink-2)"}>
         {text.length > 18 ? `${text.slice(0, 17)}…` : text}
       </text>
     );
@@ -30,7 +29,6 @@ const fmtDate = (t: number) => new Date(t).toLocaleDateString(undefined, { month
  * brand vs competitor median. One axis, two series, direct end labels.
  */
 export function IndexTrendChart({ data, height = 220, referenceLabel = "Your brand" }: { data: IndexPoint[]; height?: number; referenceLabel?: string }) {
-  const reduce = useReducedMotion();
   const vals = data.flatMap((d) => [d.reference, d.competitors]).filter((v): v is number => v !== null);
   if (vals.length < 2) {
     return <div className="flex items-center justify-center text-sm text-ink-3" style={{ height }}>Not enough history yet — the index appears after a few days of monitoring.</div>;
@@ -39,7 +37,7 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
   const hi = Math.ceil(Math.max(...vals, 100) + 1);
   const last = data.at(-1);
   return (
-    <div style={{ height }} className="relative" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
+    <div style={{ height }} className="chart-reveal relative" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: Math.min(132, Math.max(80, 14 + Math.min(referenceLabel.length, 18) * 6.6)), bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
@@ -62,8 +60,8 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
               ) : null
             }
           />
-          <Line type="linear" dataKey="competitors" stroke="var(--series-2)" strokeWidth={2} dot={false} label={endLabel(data.length, "Competitors", false)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={!reduce} animationDuration={700} connectNulls={false} />
-          <Line type="linear" dataKey="reference" stroke="var(--series-1)" strokeWidth={2.25} dot={false} label={endLabel(data.length, referenceLabel, true)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={!reduce} animationDuration={700} connectNulls={false} />
+          <Line type="linear" dataKey="competitors" stroke="var(--series-2)" strokeWidth={2} dot={false} label={endLabel(data.length, "Competitors", false)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
+          <Line type="linear" dataKey="reference" stroke="var(--series-1)" strokeWidth={2.25} dot={false} label={endLabel(data.length, referenceLabel, true)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -31,6 +31,18 @@ describe("ProductImage loading states", () => {
     expect(HTMLImageElement.prototype.decode).toHaveBeenCalled();
   });
 
+  it("shows cached, already-decoded images synchronously with no fade or skeleton", () => {
+    stubImage({ complete: true, decodes: true });
+    vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(400);
+    const { container } = render(<ProductImage src="/hit.png" alt="Hit" />);
+    expect(status(container)).toBe("cached"); // settled in the ref callback, before paint
+    expect(img(container)).toHaveClass("opacity-100");
+    expect(img(container)).not.toHaveClass("transition-opacity");
+    expect(container.querySelector(".skeleton")).toBeNull();
+    fireEvent.load(img(container)!); // a late load event must not re-trigger a fade
+    expect(status(container)).toBe("cached");
+  });
+
   it("shows the placeholder for images that were already broken", async () => {
     stubImage({ complete: true, decodes: false });
     const { container, getByRole } = render(<ProductImage src="/missing.png" alt="Missing" />);

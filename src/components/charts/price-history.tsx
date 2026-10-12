@@ -1,7 +1,7 @@
 "use client";
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { CalendarRange, Table2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Brush, CartesianGrid, ComposedChart, Line, ReferenceDot, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -36,6 +36,8 @@ interface HistoryResponse {
 }
 
 /** Value of a gap-aware step series at time t (null inside unknown stretches). */
+const HOUR_MS = 3_600_000;
+
 function stepValue(points: HistorySeries["points"], t: number): number | null {
   let lo = 0;
   let hi = points.length - 1;
@@ -68,7 +70,6 @@ const EVENT_STYLE: Record<string, { fill: string; label: string }> = {
  *  - Series toggles keep each entity's color; a table view is always one click away.
  */
 export function PriceHistory({ options, initialSelected, colorBy = "brand", defaultRange = "30d", height = 340, compact, unitScale, unitLabel }: { options: SeriesOption[]; initialSelected?: string[]; colorBy?: "brand" | "series"; defaultRange?: RangeKey; height?: number; compact?: boolean; /** Display-only normalization: price × num ÷ den per variant (e.g. per 100 g). */ unitScale?: Record<string, { num: number; den: number } | null>; unitLabel?: string }) {
-  const reduce = useReducedMotion();
   const [range, setRange] = useState<RangeKey>(defaultRange);
   const [custom, setCustom] = useState<{ from: string; to: string }>(() => ({ from: new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) }));
   const [selected, setSelected] = useState<string[]>(initialSelected ?? options.slice(0, 6).map((o) => o.variantId));
@@ -139,9 +140,20 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
   const visible = plotted.filter((s) => !hidden.has(s.variantId));
 
   // Merge onto the union of change times; each series evaluated as a step function.
+  // Render rows: only instants where some series changes (price or known/gap state) plus series
+  // ends, and an even ~240-step grid so the crosshair still scrubs smoothly. Prices are step
+  // functions, so dropping unchanged observations is exact (1,037 → ~260 rows on a 3-series group).
   const rows = (() => {
     const ts = new Set<number>();
-    for (const s of visible) for (const p of s.points) ts.add(p.t);
+    for (const s of visible) {
+      s.points.forEach((p, i, a) => {
+        const prev = a[i - 1];
+        if (!prev || i === a.length - 1 || p.price !== prev.price || p.known !== prev.known) ts.add(p.t);
+      });
+    }
+    const step = Math.max(HOUR_MS, (win.to - win.from) / 240);
+    const first = Math.min(...visible.map((s) => s.points[0]?.t ?? Infinity));
+    for (let t = Math.max(win.from, first); t <= win.to; t += step) ts.add(Math.round(t));
     const sorted = [...ts].sort((a, b) => a - b);
     return sorted.map((t) => {
       const row: Record<string, number | null> = { t };
@@ -259,7 +271,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
             <span className="text-xs">Aisle never fills gaps with invented prices — try a longer range.</span>
           </div>
         ) : (
-          <motion.div className="h-full" animate={{ opacity: isPlaceholderData ? 0.45 : 1 }} transition={{ duration: 0.2 }} role="img" aria-label={`Price history for ${visible.map((v) => v.name).join(", ")}. Table view available.`}>
+          <motion.div className="chart-reveal h-full" animate={{ opacity: isPlaceholderData ? 0.45 : 1 }} transition={{ duration: 0.2 }} role="img" aria-label={`Price history for ${visible.map((v) => v.name).join(", ")}. Table view available.`}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
                 <CartesianGrid vertical={false} />
@@ -297,9 +309,8 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
                       dot={false}
                       activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }}
                       connectNulls={false}
-                      isAnimationActive={!reduce && rows.length < 4000}
-                      animationDuration={600}
-                      animationEasing="ease-out"
+                      // Drawn in by the paint-only .chart-reveal sweep (globals.css), not per-frame JS.
+                      isAnimationActive={false}
                     />
                   );
                 })}
