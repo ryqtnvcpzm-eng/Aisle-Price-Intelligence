@@ -22,6 +22,7 @@ import {
 import { getActiveProvider, getProvider, ProviderError, type PriceSnapshot, type ProviderId, type ProviderProduct, type VariationFamily } from "../providers";
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
+import { reconcileAfterChange } from "../brand/hooks";
 import { quantitiesFor, variantLabel } from "./normalize";
 import { rescheduleListings, upsertListing, writeObservation } from "./persist";
 
@@ -322,7 +323,7 @@ function slugify(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "item";
 }
 
-export async function commitImport(ctx: AppContext, input: CommitInput) {
+export async function commitImport(ctx: AppContext, input: CommitInput, opts: { skipReconcile?: boolean } = {}) {
   const cached = await cacheGet<CachedPreview>(`import:${input.previewId}`);
   if (!cached || cached.workspaceId !== ctx.workspace.id) {
     throw new HttpError(410, "This preview expired. Paste the link again to refresh it.", "preview_expired");
@@ -481,5 +482,6 @@ export async function commitImport(ctx: AppContext, input: CommitInput) {
     );
     return { familyIds, variantIds, groupId, brandIds: [...new Set(brandIds)] };
   });
+  if (!opts.skipReconcile) await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
   return result;
 }

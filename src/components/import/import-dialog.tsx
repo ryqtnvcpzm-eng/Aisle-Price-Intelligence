@@ -52,6 +52,9 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, Set<string>>>({});
   const [brandOverrides, setBrandOverrides] = useState<Record<string, string>>({});
+  /** The preview family whose brand the person marked as theirs ("This is my brand"). */
+  const [mineKey, setMineKey] = useState<string | null>(null);
+  const [mineSaved, setMineSaved] = useState<string | null>(null);
   const [groupChoice, setGroupChoice] = useState<string>(initialGroupId ?? "none");
   const [newGroupName, setNewGroupName] = useState("");
   const [interval, setIntervalChoice] = useState(String(app.workspace.settings.defaultIntervalMinutes ?? 60));
@@ -124,6 +127,16 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
           intervalMinutes: interval === "paused" ? null : Number(interval),
         },
       });
+      const mine = mineKey ? preview.families.find((f) => f.key === mineKey && selected[f.key]?.size) : null;
+      const mineName = mine ? (brandOverrides[mine.key] || mine.brand || "").trim() : "";
+      if (mineName && mineName !== app.referenceBrand?.name) {
+        try {
+          await api("/api/brands/reference", { method: "POST", body: { brandName: mineName } });
+          setMineSaved(mineName);
+        } catch {
+          toast.error("Products were added, but your brand couldn't be saved. Set it on the Brands page.");
+        }
+      }
       setResult(res);
       setPhase("done");
       onDone?.(res);
@@ -328,6 +341,9 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                       onToggleAll={(on) => setSelected((s) => ({ ...s, [f.key]: new Set(on ? f.variants.filter((v) => v.status !== "no_data").map((v) => v.asin) : []) }))}
                       brand={brandOverrides[f.key] ?? f.brand ?? ""}
                       onBrand={(b) => setBrandOverrides((s) => ({ ...s, [f.key]: b }))}
+                      referenceBrand={app.referenceBrand?.name ?? null}
+                      mine={mineKey === f.key}
+                      onMine={(on) => setMineKey(on ? f.key : null)}
                     />
                   ))}
                 </LayoutGroup>
@@ -388,6 +404,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                 <h3 className="mt-5 text-xl font-semibold tracking-tight">
                   Tracking {result.variantIds.length} variant{result.variantIds.length === 1 ? "" : "s"}
                 </h3>
+                {mineSaved && <p className="mt-1.5 text-sm font-medium text-ink">{mineSaved} is now your brand.</p>}
                 <p className="mt-1.5 max-w-[380px] text-sm text-ink-2">
                   {interval === "paused" ? "Monitoring is paused — turn it on from the product page whenever you're ready." : `First prices are saved. Aisle will check again ${INTERVALS.find((i) => i.value === interval)?.label.toLowerCase()} in the background.`}
                 </p>
@@ -487,7 +504,8 @@ function LoadingPreview({ label, onCancel }: { label: string; onCancel: () => vo
   );
 }
 
-function FamilyPreview({ family: f, index, selected, onToggle, onToggleAll, brand, onBrand }: { family: PreviewFamily; index: number; selected: Set<string>; onToggle: (asin: string, on: boolean) => void; onToggleAll: (on: boolean) => void; brand: string; onBrand: (b: string) => void }) {
+function FamilyPreview({ family: f, index, selected, onToggle, onToggleAll, brand, onBrand, referenceBrand, mine, onMine }: { family: PreviewFamily; index: number; selected: Set<string>; onToggle: (asin: string, on: boolean) => void; onToggleAll: (on: boolean) => void; brand: string; onBrand: (b: string) => void; referenceBrand: string | null; mine: boolean; onMine: (on: boolean) => void }) {
+  const isReference = Boolean(referenceBrand && brand.trim() && brand.trim().toLowerCase() === referenceBrand.toLowerCase());
   const mp = isMarketplaceCode(f.marketplace) ? getMarketplace(f.marketplace) : null;
   const selectable = f.variants.filter((v) => v.status !== "no_data");
   const all = selectable.length > 0 && selectable.every((v) => selected.has(v.asin));
@@ -511,6 +529,15 @@ function FamilyPreview({ family: f, index, selected, onToggle, onToggleAll, bran
           <h3 className="mt-1.5 line-clamp-2 text-md font-semibold leading-snug tracking-tight">{f.title}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-3">
             <input value={brand} onChange={(e) => onBrand(e.target.value)} placeholder="Brand" aria-label="Brand" className="w-[150px] rounded-[6px] bg-transparent px-1 py-0.5 -mx-1 font-medium text-ink-2 outline-none hover:bg-[var(--hairline)] focus:bg-surface-2 focus:shadow-[inset_0_0_0_1px_var(--accent)]" />
+            {isReference ? (
+              <Badge tone="accent" size="xs">Your brand</Badge>
+            ) : (
+              brand.trim() && (
+                <button type="button" aria-pressed={mine} onClick={() => onMine(!mine)} className={cn("h-[18px] rounded-full px-2 text-2xs font-medium transition-colors", mine ? "bg-accent text-white" : "text-ink-2 shadow-[inset_0_0_0_0.5px_var(--line-strong)] hover:bg-[var(--hairline)]")}>
+                  {mine ? "✓ My brand" : "This is my brand"}
+                </button>
+              )
+            )}
             {mp && <span>{mp.flag} {mp.domain.replace("www.", "")}</span>}
             <span className="num">ASIN {f.primaryAsin}</span>
             {f.parentAsin && <span className="num">Parent {f.parentAsin}</span>}

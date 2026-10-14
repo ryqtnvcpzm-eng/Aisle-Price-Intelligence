@@ -6,6 +6,7 @@ import { db } from "../db/client";
 import { brands, listings, productFamilies, variantQuantities, variants } from "../db/schema";
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
+import { reconcileAfterChange } from "../brand/hooks";
 import { rescheduleListings } from "./persist";
 
 export const INTERVALS = [60, 180, 360, 720, 1440] as const;
@@ -32,6 +33,7 @@ export async function patchVariants(ctx: AppContext, ids: string[], patch: z.inf
       await rescheduleListings(tx, rows.map((r) => r.listingId));
     }
   });
+  if (patch.tracked !== undefined || patch.hidden !== undefined) await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
   if (patch.tracked !== undefined || patch.intervalMinutes !== undefined) {
     const what = patch.tracked === false ? "Stopped tracking" : patch.tracked ? "Started tracking" : patch.intervalMinutes === null ? "Paused monitoring for" : "Changed monitoring for";
     await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: "monitoring_changed", message: `${what} ${ids.length} variant${ids.length === 1 ? "" : "s"}`, metadata: { ids, patch } });
@@ -60,12 +62,14 @@ export async function setQuantity(ctx: AppContext, variantId: string, input: z.i
       target: [variantQuantities.variantId, variantQuantities.dimension],
       set: { packCount: input.packCount, unitAmount: String(input.unitAmount), unit: input.unit, totalMilli, confidence: "manual", updatedBy: ctx.user.id, updatedAt: new Date() },
     });
+  await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
   await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: "quantity_corrected", message: `Corrected quantity to ${input.packCount > 1 ? `${input.packCount} × ` : ""}${input.unitAmount} ${input.unit}`, entityType: "variant", entityId: variantId });
 }
 
 export async function deleteQuantity(ctx: AppContext, variantId: string, dimension: string) {
   await ownedVariants(ctx.workspace.id, [variantId]);
   await db.delete(variantQuantities).where(and(eq(variantQuantities.variantId, variantId), sql`${variantQuantities.dimension} = ${dimension}`));
+  await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
 }
 
 export const familyPatchSchema = z.object({
@@ -101,20 +105,10 @@ export async function patchFamilies(ctx: AppContext, ids: string[], patch: z.inf
       await rescheduleListings(tx, ls.map((l) => l.id));
     }
   });
+  if (patch.archived !== undefined || patch.brandName) await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
   if (patch.archived !== undefined) {
     await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: patch.archived ? "archived" : "restored", message: `${patch.archived ? "Archived" : "Restored"} ${ids.length} product${ids.length === 1 ? "" : "s"}`, metadata: { ids } });
   }
-}
-
-export async function setReferenceBrand(ctx: AppContext, brandId: string | null) {
-  await db.transaction(async (tx) => {
-    await tx.update(brands).set({ isReference: false }).where(eq(brands.workspaceId, ctx.workspace.id));
-    if (brandId) {
-      const res = await tx.update(brands).set({ isReference: true }).where(and(eq(brands.id, brandId), eq(brands.workspaceId, ctx.workspace.id))).returning({ name: brands.name });
-      if (!res.length) throw new HttpError(404, "Brand not found.");
-      await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: "reference_brand", message: `Set ${res[0]!.name} as the reference brand`, entityType: "brand", entityId: brandId }, tx);
-    }
-  });
 }
 
 export async function listingRowsForVariants(workspaceId: string, variantIds: string[]) {

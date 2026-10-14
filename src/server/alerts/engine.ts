@@ -1,8 +1,9 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { compare, type ComparisonInput } from "@/lib/comparison";
 import { formatMoney, formatPct } from "@/lib/money";
-import { isNormalizationBasis } from "@/lib/quantity";
+import { isNormalizationBasis, NORMALIZATION_BASES } from "@/lib/quantity";
 import { db } from "../db/client";
 import {
   alertEvents,
@@ -32,10 +33,11 @@ export interface AlertCandidate {
   isSimulated: boolean;
 }
 
-interface VariantState {
+export interface VariantState {
   variantId: string;
   workspaceId: string;
   listingId: string;
+  brandId: string | null;
   name: string;
   currency: string | null;
   price: number | null;
@@ -43,6 +45,11 @@ interface VariantState {
   prevDistinctPrice: number | null;
   availability: string;
   prevAvailability: string | null;
+  /** Provenance of the previous observation, so simulated and verified prices are never compared. */
+  prevIsSimulated: boolean | null;
+  prevCurrency: string | null;
+  /** Provenance of the latest observation (the listing flag says what the listing is, not what this reading was). */
+  curIsSimulated: boolean | null;
   price24h: number | null;
   observedAt: Date | null;
   lastSuccessAt: Date | null;
@@ -57,6 +64,7 @@ async function loadVariantStates(where: { listingIds?: string[]; variantIds?: st
       variantId: variants.id,
       workspaceId: variants.workspaceId,
       listingId: variants.listingId,
+      brandId: productFamilies.brandId,
       label: variants.label,
       familyTitle: productFamilies.title,
       currency: listings.currency,
@@ -81,11 +89,11 @@ async function loadVariantStates(where: { listingIds?: string[]; variantIds?: st
   if (!rows.length) return [];
   const listingIds = [...new Set(rows.map((r) => r.listingId))];
   // Previous observation and previous *different* price per listing.
-  const prev = await db.execute<{ listing_id: string; price_minor: number | null; availability: string; rn: number }>(sql`
-    select listing_id, price_minor, availability, rn from (
-      select listing_id, price_minor, availability, row_number() over (partition by listing_id order by observed_at desc) rn
+  const prev = await db.execute<{ listing_id: string; price_minor: number | null; availability: string; is_simulated: boolean; currency: string; rn: number }>(sql`
+    select listing_id, price_minor, availability, is_simulated, currency, rn from (
+      select listing_id, price_minor, availability, is_simulated, currency, row_number() over (partition by listing_id order by observed_at desc) rn
       from price_observations where listing_id in ${listingIds}
-    ) x where rn = 2`);
+    ) x where rn <= 2`);
   const prevDistinct = await db.execute<{ listing_id: string; price_minor: number }>(sql`
     select distinct on (o.listing_id) o.listing_id, o.price_minor
     from price_observations o join listings l on l.id = o.listing_id
@@ -96,12 +104,14 @@ async function loadVariantStates(where: { listingIds?: string[]; variantIds?: st
     where listing_id in ${listingIds} and observed_at <= now() - interval '24 hours' and observed_at >= now() - interval '48 hours'
     order by listing_id, observed_at desc`);
   const agoMap = new Map(ago.map((a) => [a.listing_id, a.price_minor]));
-  const prevMap = new Map(prev.map((p) => [p.listing_id, p]));
+  const prevMap = new Map(prev.filter((p) => Number(p.rn) === 2).map((p) => [p.listing_id, p]));
+  const curMap = new Map(prev.filter((p) => Number(p.rn) === 1).map((p) => [p.listing_id, p]));
   const distinctMap = new Map(prevDistinct.map((p) => [p.listing_id, p.price_minor]));
   return rows.map((r) => ({
     variantId: r.variantId,
     workspaceId: r.workspaceId,
     listingId: r.listingId,
+    brandId: r.brandId,
     name: `${r.familyTitle.split(",")[0]} · ${r.label}`,
     currency: r.currency,
     price: r.price,
@@ -109,6 +119,9 @@ async function loadVariantStates(where: { listingIds?: string[]; variantIds?: st
     prevDistinctPrice: distinctMap.get(r.listingId) ?? null,
     availability: r.availability,
     prevAvailability: prevMap.get(r.listingId)?.availability ?? null,
+    prevIsSimulated: prevMap.get(r.listingId)?.is_simulated ?? null,
+    prevCurrency: prevMap.get(r.listingId)?.currency ?? null,
+    curIsSimulated: curMap.get(r.listingId)?.is_simulated ?? null,
     price24h: agoMap.get(r.listingId) ?? null,
     observedAt: r.observedAt,
     lastSuccessAt: r.lastSuccessAt,
@@ -177,6 +190,36 @@ function evaluateVariantRule(rule: AlertRule, v: VariantState): AlertCandidate |
   }
 }
 
+const KNOWN_AVAILABLE = new Set(["in_stock", "limited", "preorder"]);
+
+/**
+ * Protect My Brand rules evaluated per listing inside a managed comparison.
+ * Both compare two *consecutive observations* of the same listing: nothing is
+ * interpolated, unknown availability never counts as out of stock, and a
+ * simulated observation is never compared with a verified one.
+ */
+export function evaluateProtectionVariantRule(rule: Pick<AlertRule, "type" | "params">, v: VariantState, referenceBrandId: string | null): Omit<AlertCandidate, "rule"> | null {
+  if (!referenceBrandId) return null;
+  const isReference = v.brandId === referenceBrandId;
+  const base = { variantId: v.variantId, isSimulated: v.isSimulated };
+  switch (rule.type) {
+    case "reference_out_of_stock":
+      if (!isReference || v.availability !== "out_of_stock" || !v.prevAvailability || !KNOWN_AVAILABLE.has(v.prevAvailability)) return null;
+      return { ...base, headline: `${v.name} is out of stock`, detail: `Your listing was ${v.prevAvailability.replace("_", " ")} at the previous check${v.prevPrice !== null ? ` (${money(v, v.prevPrice)})` : ""}.`, metrics: { previousAvailability: v.prevAvailability, previous: v.prevPrice }, dedupeKey: `ref_oos:${v.variantId}:${obsKey(v)}` };
+    case "rival_drop_5pct": {
+      const pct = rule.params.pct ?? 5;
+      if (isReference || v.price === null || v.prevPrice === null || v.prevPrice <= 0) return null;
+      if (v.prevIsSimulated === null || v.curIsSimulated === null || v.prevIsSimulated !== v.curIsSimulated) return null;
+      if (v.prevCurrency && v.currency && v.prevCurrency !== v.currency) return null;
+      const r = (v.price - v.prevPrice) / v.prevPrice;
+      if (r > -pct / 100) return null;
+      return { ...base, headline: `${v.name} dropped ${formatPct(Math.abs(r))}`, detail: `${money(v, v.prevPrice)} → ${money(v, v.price)} between two consecutive checks.`, metrics: { from: v.prevPrice, to: v.price, ratio: r }, dedupeKey: `rival_drop:${v.variantId}:${obsKey(v)}` };
+    }
+    default:
+      return null;
+  }
+}
+
 async function historicalLow(rule: AlertRule, v: VariantState): Promise<AlertCandidate | null> {
   if (v.price === null) return null;
   const days = rule.params.windowDays ?? 90;
@@ -200,7 +243,7 @@ async function historicalLow(rule: AlertRule, v: VariantState): Promise<AlertCan
 async function evaluateGroupRule(rule: AlertRule): Promise<AlertCandidate | null> {
   if (!rule.groupId) return null;
   const [group] = await db.select().from(comparisonGroups).where(eq(comparisonGroups.id, rule.groupId));
-  if (!group) return null;
+  if (!group || group.archivedAt) return null;
   const items = await db
     .select({ id: variants.id, role: comparisonItems.role, status: comparisonItems.status, label: variants.label, title: productFamilies.title, brand: brands.name, isRef: brands.isReference, price: listings.currentPriceMinor, currency: listings.currency, availability: listings.availability, sim: listings.isSimulated, refBrandId: comparisonGroups.referenceBrandId, brandId: productFamilies.brandId })
     .from(comparisonItems)
@@ -249,11 +292,29 @@ async function evaluateGroupRule(rule: AlertRule): Promise<AlertCandidate | null
       if (!previous || previous === leader.id) return null;
       return { ...base, variantId: leader.id, headline: `New price leader in ${group.name}: ${leader.brandName ?? ""} ${leader.label}`.trim(), detail: `Lowest unit price is now ${formatMoney(leader.unitPriceMinor, res.currency ?? "INR")}.`, metrics: { leader: leader.id, previous }, dedupeKey: `leader:${group.id}:${leader.id}:${previous}` };
     }
+    case "price_leadership_change": {
+      const leader = res.cheapest;
+      if (!leader) return null;
+      // Leadership is held by a brand, not a pack size: switching between two of the same brand's listings isn't news.
+      const leaderKey = leader.role === "reference" ? "reference" : `brand:${leader.brandName ?? "unbranded"}`;
+      const previous = (rule.state as { leaderKey?: string }).leaderKey;
+      await db.update(alertRules).set({ state: { ...rule.state, leaderKey, leaderId: leader.id } }).where(eq(alertRules.id, rule.id));
+      if (!previous || previous === leaderKey) return null;
+      const who = leader.role === "reference" ? `${leader.brandName ?? "Your brand"} (your brand)` : (leader.brandName ?? "An unbranded listing");
+      const headline = leader.role === "reference" ? `${who} now has the lowest unit price in ${group.name}` : previous === "reference" ? `${who} took the lowest unit price from you in ${group.name}` : `${who} now has the lowest unit price in ${group.name}`;
+      return { ...base, variantId: null, headline, detail: `${leader.label} at ${formatMoney(leader.unitPriceMinor, res.currency ?? "INR")}${NORMALIZATION_BASES[res.basis].label}.`, metrics: { leader: leader.id, leaderKey, previous }, dedupeKey: `leadership:${group.id}:${previous}->${leaderKey}:${obsSignature(items)}` };
+    }
     case "historical_low":
       return null;
     default:
       return null;
   }
+}
+
+/** Identifies the set of observations a group evaluation saw, so one change fires one event. */
+function obsSignature(items: { id: string; price: number | null }[]) {
+  const sig = items.map((i) => `${i.id}=${i.price ?? "-"}`).sort().join(",");
+  return createHash("sha1").update(sig).digest("hex").slice(0, 16);
 }
 
 function inQuietHours(rule: AlertRule, timeZone: string, now = new Date()): boolean {
@@ -311,9 +372,19 @@ export async function evaluateAlertsForListings(listingIds: string[], _ctx: { tr
   for (const rule of rules) {
     try {
       const candidates: AlertCandidate[] = [];
-      if (rule.groupId && ["competitor_undercut", "gap_exceeds", "leader_change"].includes(rule.type)) {
+      if (rule.groupId && ["competitor_undercut", "gap_exceeds", "leader_change", "price_leadership_change"].includes(rule.type)) {
         const c = await evaluateGroupRule(rule);
         if (c) candidates.push(c);
+      } else if (rule.groupId && (rule.type === "reference_out_of_stock" || rule.type === "rival_drop_5pct")) {
+        const [g] = await db.select({ refBrandId: comparisonGroups.referenceBrandId, archivedAt: comparisonGroups.archivedAt }).from(comparisonGroups).where(eq(comparisonGroups.id, rule.groupId));
+        if (g && !g.archivedAt) {
+          const refBrandId = g.refBrandId ?? (await db.select({ id: brands.id }).from(brands).where(and(eq(brands.workspaceId, rule.workspaceId), eq(brands.isReference, true))))[0]?.id ?? null;
+          const members = new Set((await db.select({ variantId: comparisonItems.variantId }).from(comparisonItems).where(and(eq(comparisonItems.groupId, rule.groupId), eq(comparisonItems.status, "confirmed")))).map((m) => m.variantId));
+          for (const s of states.filter((x) => members.has(x.variantId))) {
+            const c = evaluateProtectionVariantRule(rule, s, refBrandId);
+            if (c) candidates.push({ ...c, rule });
+          }
+        }
       } else if (rule.groupId) {
         // Variant-type rule applied to every member of a group.
         const members = await db.select({ variantId: comparisonItems.variantId }).from(comparisonItems).where(eq(comparisonItems.groupId, rule.groupId));

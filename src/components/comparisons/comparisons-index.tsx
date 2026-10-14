@@ -31,6 +31,7 @@ interface Card {
   headline: string | null;
   simulated: boolean;
   bars: { id: string; unit: number; role: string }[];
+  managed: boolean;
 }
 
 export function ComparisonsIndex({ cards }: { cards: Card[] }) {
@@ -65,6 +66,7 @@ export function ComparisonsIndex({ cards }: { cards: Card[] }) {
                 <div className="min-w-0">
                   <h3 className="truncate text-md font-semibold tracking-tight">{c.name}</h3>
                   <p className="mt-0.5 text-xs text-ink-3">
+                    {c.managed && <span className="font-medium text-accent">Auto · </span>}
                     {c.items} listings · {c.brands.length} brands · {NORMALIZATION_BASES[c.basis as NormalizationBasis]?.long ?? c.basis}
                   </p>
                 </div>

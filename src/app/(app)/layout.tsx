@@ -6,6 +6,7 @@ import type { AppInfo } from "@/components/shell/app-context";
 import { db } from "@/server/db/client";
 import { DEMO_SAMPLE_LINKS } from "@/server/providers/demo/catalog";
 import { dataMode, getActiveProvider } from "@/server/providers";
+import { getReferenceBrand } from "@/server/brand/reference";
 import { requireContext } from "@/server/workspace/context";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const jar = await cookies();
   const mpRows = await db.execute<{ marketplace: string }>(sql`select distinct marketplace from product_families where workspace_id = ${ctx.workspace.id} and archived_at is null order by 1`);
   const mode = dataMode();
+  const reference = await getReferenceBrand(ctx.workspace.id);
   const info: AppInfo = {
     user: ctx.user,
     workspace: {
@@ -29,6 +31,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     dataMode: mode,
     providerLabel: getActiveProvider().label,
     sampleLinks: mode === "demo" ? DEMO_SAMPLE_LINKS : [],
+    referenceBrand: reference ? { id: reference.id, name: reference.name } : null,
     marketplaces: [...new Set([ctx.workspace.defaultMarketplace, ...mpRows.map((r) => r.marketplace)])],
   };
   const mp = jar.get("aisle_mp")?.value;

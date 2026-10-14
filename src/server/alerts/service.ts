@@ -7,6 +7,7 @@ import { alertEvents, alertRules, comparisonGroups, notifications, variants } fr
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
 import { deliverAlertEvent } from "./deliver";
+import { isManagedRule } from "./protection";
 
 export const ALERT_TYPES = {
   price_below: { label: "Price drops below", scope: "variant_or_group", needs: "thresholdMinor" },
@@ -23,6 +24,9 @@ export const ALERT_TYPES = {
   stale_data: { label: "Hasn't refreshed", scope: "any", needs: "hours" },
   quota_exhausted: { label: "Provider quota exhausted", scope: "workspace", needs: null },
   monitoring_failures: { label: "Repeated monitoring failures", scope: "any", needs: "failures" },
+  price_leadership_change: { label: "Price leadership changes brand", scope: "group", needs: null },
+  reference_out_of_stock: { label: "Your listing goes out of stock", scope: "group", needs: null },
+  rival_drop_5pct: { label: "A rival drops its price by 5%+", scope: "group", needs: null },
 } as const;
 export type AlertTypeKey = keyof typeof ALERT_TYPES;
 
@@ -95,6 +99,9 @@ export async function updateRule(ctx: AppContext, id: string, input: Partial<z.i
 }
 
 export async function deleteRule(ctx: AppContext, id: string) {
+  const [rule] = await db.select({ managedKey: alertRules.managedKey }).from(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.workspaceId, ctx.workspace.id)));
+  // Managed rules would be recreated by the next reconcile; pausing is the honest control.
+  if (rule && isManagedRule(rule)) throw new HttpError(409, "This alert is part of Protect My Brand. Pause it, or turn the pack off on the Alerts page.", "managed_rule");
   const res = await db.delete(alertRules).where(and(eq(alertRules.id, id), eq(alertRules.workspaceId, ctx.workspace.id))).returning({ name: alertRules.name });
   if (!res.length) throw new HttpError(404, "Alert not found.");
   await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: "alert_deleted", message: `Deleted alert “${res[0]!.name}”` });

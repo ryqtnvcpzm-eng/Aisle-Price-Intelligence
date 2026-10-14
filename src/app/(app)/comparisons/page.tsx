@@ -24,6 +24,7 @@ export default async function ComparisonsPage() {
     referencePremium: d.result.referenceBest?.premium ?? null,
     headline: d.result.findings[0]?.text ?? null,
     simulated: d.items.some((i) => i.isSimulated),
+    managed: Boolean(d.group.managedBy),
     bars: d.result.rows.filter((r) => r.comparable).sort((a, b) => a.unitPriceMinor! - b.unitPriceMinor!).map((r) => ({ id: r.id, unit: r.unitPriceMinor!, role: r.role })),
   }));
   return (

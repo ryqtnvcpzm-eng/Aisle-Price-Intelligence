@@ -11,6 +11,8 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias },
   test: {
+    // Integration files share one database and the shared listing catalog, so files run one at a time.
+    fileParallelism: false,
     projects: [
       {
         resolve: { alias },

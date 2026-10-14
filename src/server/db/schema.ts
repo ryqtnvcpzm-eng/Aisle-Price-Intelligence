@@ -64,9 +64,16 @@ export const alertType = pgEnum("alert_type", [
   "stale_data",
   "quota_exhausted",
   "monitoring_failures",
+  // "Protect My Brand" pack (managed rules scoped to the workspace's reference-brand cohorts).
+  "price_leadership_change",
+  "reference_out_of_stock",
+  "rival_drop_5pct",
 ]);
 export const alertFrequency = pgEnum("alert_frequency", ["instant", "daily", "weekly"]);
 export const reportFormat = pgEnum("report_format", ["csv", "xlsx", "pdf"]);
+export const deliveryStatus = pgEnum("delivery_status", ["pending", "sending", "sent", "failed", "skipped"]);
+export const importJobStatus = pgEnum("import_job_status", ["queued", "running", "paused", "completed", "cancelled", "failed"]);
+export const importItemStatus = pgEnum("import_item_status", ["pending", "processing", "succeeded", "failed", "skipped", "cancelled"]);
 
 // ─── Auth (Better Auth core schema) ─────────────────────────────────────────
 
@@ -137,6 +144,10 @@ export interface WorkspaceSettings {
   emailAlerts: boolean;
   exportIncludeMethodology: boolean;
   significantChangePct: number;
+  /** "Protect My Brand" pack switch; the managed rules themselves live in `alert_rules`. */
+  brandProtection?: boolean;
+  /** Email the Monday Briefing to members (real data only, and only when email is configured). */
+  emailBriefing?: boolean;
 }
 
 export const workspaces = pgTable("workspaces", {
@@ -180,10 +191,11 @@ export const brands = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /** The workspace's own brand ("My Brand"). At most one per workspace, enforced by a partial unique index. */
     isReference: boolean("is_reference").notNull().default(false),
     createdAt: createdAt(),
   },
-  (t) => [uniqueIndex("brands_ws_slug_uq").on(t.workspaceId, t.slug)],
+  (t) => [uniqueIndex("brands_ws_slug_uq").on(t.workspaceId, t.slug), uniqueIndex("brands_ws_reference_uq").on(t.workspaceId).where(sql`${t.isReference}`)],
 );
 
 export const categories = pgTable(
@@ -434,11 +446,18 @@ export const comparisonGroups = pgTable(
     referenceBrandId: uuid("reference_brand_id").references(() => brands.id, { onDelete: "set null" }),
     standardQuantityMilli: bigint("standard_quantity_milli", { mode: "number" }),
     createdBy: text("created_by"),
+    /** Set for groups Aisle maintains itself (e.g. "reference_market"); null for user-built comparisons. */
+    managedBy: text("managed_by"),
+    /** Stable cohort key within a managed set: marketplace + category + normalization basis. */
+    managedCohort: text("managed_cohort"),
     archivedAt: ts("archived_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index("groups_ws_idx").on(t.workspaceId)],
+  (t) => [
+    index("groups_ws_idx").on(t.workspaceId),
+    uniqueIndex("groups_ws_managed_uq").on(t.workspaceId, t.managedBy, t.managedCohort).where(sql`${t.managedBy} is not null`),
+  ],
 );
 
 export const comparisonItems = pgTable(
@@ -567,12 +586,16 @@ export const alertRules = pgTable(
     cooldownMinutes: integer("cooldown_minutes").notNull().default(360),
     quietHours: jsonb("quiet_hours").$type<QuietHours | null>(),
     paused: boolean("paused").notNull().default(false),
+    /** Idempotency key for rules Aisle creates itself (e.g. the Protect My Brand pack); null for user rules. */
+    managedKey: text("managed_key"),
+    /** Evaluation memory for transition rules (e.g. the last observed price leader). */
+    state: jsonb("state").$type<Record<string, unknown>>().notNull().default({}),
     lastEvaluatedAt: ts("last_evaluated_at"),
     lastTriggeredAt: ts("last_triggered_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [index("rules_ws_idx").on(t.workspaceId)],
+  (t) => [index("rules_ws_idx").on(t.workspaceId), uniqueIndex("rules_ws_managed_uq").on(t.workspaceId, t.managedKey).where(sql`${t.managedKey} is not null`)],
 );
 
 export const alertEvents = pgTable(
@@ -617,6 +640,128 @@ export const notifications = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index("notif_ws_time_idx").on(t.workspaceId, t.createdAt.desc())],
+);
+
+/**
+ * One outbound message to one recipient (email today). Every send attempt is
+ * recorded so the UI can show honest delivery status; `idempotencyKey` is
+ * unique and is also passed to the email provider, so retries never duplicate.
+ */
+export const notificationDeliveries = pgTable(
+  "notification_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    channel: text("channel").notNull().default("email"),
+    kind: text("kind").notNull(),
+    recipient: text("recipient").notNull(),
+    subject: text("subject").notNull(),
+    alertEventId: uuid("alert_event_id").references(() => alertEvents.id, { onDelete: "set null" }),
+    briefingId: uuid("briefing_id"),
+    status: deliveryStatus("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    maxAttempts: integer("max_attempts").notNull().default(4),
+    nextAttemptAt: ts("next_attempt_at"),
+    lastError: text("last_error"),
+    providerMessageId: text("provider_message_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    payload: jsonb("payload").$type<{ text: string; html: string }>().notNull(),
+    isTest: boolean("is_test").notNull().default(false),
+    isSimulated: boolean("is_simulated").notNull().default(false),
+    sentAt: ts("sent_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("deliveries_idem_uq").on(t.idempotencyKey),
+    index("deliveries_due_idx").on(t.status, t.nextAttemptAt),
+    index("deliveries_ws_time_idx").on(t.workspaceId, t.createdAt.desc()),
+  ],
+);
+
+/** A stored weekly briefing (previous Monday–Sunday in the workspace time zone). One per workspace and week. */
+export const briefings = pgTable(
+  "briefings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    /** Local calendar dates (YYYY-MM-DD) in `timeZone`. */
+    weekStart: text("week_start").notNull(),
+    weekEnd: text("week_end").notNull(),
+    timeZone: text("time_zone").notNull(),
+    periodStart: ts("period_start").notNull(),
+    periodEnd: ts("period_end").notNull(),
+    referenceBrandId: uuid("reference_brand_id").references(() => brands.id, { onDelete: "set null" }),
+    referenceBrandName: text("reference_brand_name"),
+    content: jsonb("content").$type<Record<string, unknown>>().notNull(),
+    containsSimulated: boolean("contains_simulated").notNull().default(false),
+    version: integer("version").notNull().default(1),
+    generatedBy: text("generated_by"),
+    generatedAt: ts("generated_at").notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("briefings_ws_week_uq").on(t.workspaceId, t.weekStart)],
+);
+
+// ─── Bulk import jobs ───────────────────────────────────────────────────────
+
+export interface ImportJobOptions {
+  variantPolicy: "pasted_only" | "all_variants";
+  intervalMinutes: number | null;
+  groupId: string | null;
+  defaultMarketplace: string;
+}
+
+/** A queued bulk import. Items are processed in chunks of 25 by the web app (while open) or the worker. */
+export const importJobs = pgTable(
+  "import_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    status: importJobStatus("status").notNull().default("queued"),
+    total: integer("total").notNull().default(0),
+    options: jsonb("options").$type<ImportJobOptions>().notNull(),
+    /** Lease held by whichever process is running a chunk; expired leases are taken over (resume after a crash or closed tab). */
+    leaseUntil: ts("lease_until"),
+    lastError: text("last_error"),
+    isSimulated: boolean("is_simulated").notNull().default(false),
+    startedAt: ts("started_at"),
+    finishedAt: ts("finished_at"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("import_jobs_ws_idx").on(t.workspaceId, t.createdAt.desc()), index("import_jobs_status_idx").on(t.status)],
+);
+
+export const importJobItems = pgTable(
+  "import_job_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => importJobs.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    input: text("input").notNull(),
+    marketplace: text("marketplace"),
+    asin: text("asin"),
+    status: importItemStatus("status").notNull().default("pending"),
+    familyId: uuid("family_id").references(() => productFamilies.id, { onDelete: "set null" }),
+    variantIds: uuid("variant_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    newVariants: integer("new_variants").notNull().default(0),
+    errorCode: text("error_code"),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex("import_items_job_pos_uq").on(t.jobId, t.position), index("import_items_job_status_idx").on(t.jobId, t.status)],
 );
 
 // ─── Views, reports, activity ───────────────────────────────────────────────
@@ -698,6 +843,11 @@ export type ProductFamily = typeof productFamilies.$inferSelect;
 export type ComparisonGroup = typeof comparisonGroups.$inferSelect;
 export type AlertRule = typeof alertRules.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
+export type Brand = typeof brands.$inferSelect;
+export type NotificationDelivery = typeof notificationDeliveries.$inferSelect;
+export type Briefing = typeof briefings.$inferSelect;
+export type ImportJob = typeof importJobs.$inferSelect;
+export type ImportJobItem = typeof importJobItems.$inferSelect;
 
 /** Short-lived key/value cache used when Redis isn't configured (e.g. serverless free tiers). */
 export const cacheEntries = pgTable("cache_entries", {
