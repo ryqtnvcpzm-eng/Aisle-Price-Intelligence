@@ -379,7 +379,7 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
               </div>
 
               {(rules.length > 0 || variants.some((v) => v.groups.length)) && (
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="card p-4">
                     <div className="text-sm font-semibold">In comparisons</div>
                     <ul className="mt-2 space-y-1">

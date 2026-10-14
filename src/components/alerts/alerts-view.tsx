@@ -286,7 +286,7 @@ function RuleDialog({ open, onOpenChange, rule, prefill, variants, groups, email
         <Field label="Name" hint="Optional — defaults to the condition.">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t.label} />
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Delivery">
             <Select ariaLabel="Frequency" className="w-full" value={frequency} onValueChange={setFrequency} options={[{ value: "instant", label: "As it happens" }, { value: "daily", label: "Daily digest" }, { value: "weekly", label: "Weekly digest" }]} />
           </Field>

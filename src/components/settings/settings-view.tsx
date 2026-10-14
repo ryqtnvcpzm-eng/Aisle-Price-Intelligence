@@ -68,7 +68,7 @@ export function SettingsView({ user, role, workspace, providers, verification, m
   const setSetting = (k: string, v: unknown) => save({ settings: { [k]: v } });
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[200px_minmax(0,1fr)]">
       <nav className="hidden lg:block" aria-label="Settings sections">
         <ul className="sticky top-20 space-y-0.5">
           {SECTIONS.map((s) => (

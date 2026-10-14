@@ -30,12 +30,15 @@ export function AuthForm({ mode, demoEnabled }: { mode: "sign-in" | "sign-up"; d
         : await authClient.signIn.email(demo ? DEMO_CREDENTIALS : { email, password });
     if (res.error) {
       setLoading(null);
+      const invalid = res.error.status === 401 || res.error.code === "INVALID_EMAIL_OR_PASSWORD";
       setError(
-        demo
-          ? "The demo account isn't seeded yet. Run `pnpm db:seed` and try again."
-          : res.error.status === 401 || res.error.code === "INVALID_EMAIL_OR_PASSWORD"
-            ? "That email and password don't match."
-            : (res.error.message ?? "Something went wrong."),
+        res.error.status === 429
+          ? "Too many attempts in a short time. Wait a few seconds and try again."
+          : demo && invalid
+            ? "The demo workspace isn’t set up on this server yet. Run `pnpm db:seed` (or the “Set up database” workflow) and try again."
+            : invalid
+              ? "That email and password don’t match."
+              : (res.error.message ?? "Something went wrong. Please try again."),
       );
       return;
     }

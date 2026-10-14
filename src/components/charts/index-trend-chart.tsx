@@ -37,7 +37,7 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
   const hi = Math.ceil(Math.max(...vals, 100) + 1);
   const last = data.at(-1);
   return (
-    <div style={{ height }} className="chart-reveal relative" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
+    <div style={{ height }} className="chart-reveal relative [overflow-x:clip]" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: Math.min(132, Math.max(80, 14 + Math.min(referenceLabel.length, 18) * 6.6)), bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />

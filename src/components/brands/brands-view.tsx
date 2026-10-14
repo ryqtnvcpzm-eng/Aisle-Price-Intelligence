@@ -77,7 +77,7 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
           {/* Highest premium first; brands without a comparison overlap sit last, muted. */}
           {[...stats].sort((a, b) => (a.medianPremium === null ? 1 : 0) - (b.medianPremium === null ? 1 : 0) || (b.medianPremium ?? 0) - (a.medianPremium ?? 0)).map((s, i) => (
             <motion.li key={s.name} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: staggerDelay(i) }}>
-              <button onClick={() => setActive(s.name)} className={cn("grid w-full grid-cols-[160px_1fr_72px] items-center gap-3 rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--hairline)]", active === s.name && "bg-accent-softer")}>
+              <button onClick={() => setActive(s.name)} className={cn("grid w-full grid-cols-[160px_minmax(0,1fr)_72px] items-center gap-3 rounded-[10px] px-2 py-1.5 text-left transition-colors hover:bg-[var(--hairline)]", active === s.name && "bg-accent-softer")}>
                 <span className={cn("flex items-center gap-2 truncate text-sm font-medium", s.medianPremium === null && "text-ink-3")}>
                   <span className="size-2.5 shrink-0 rounded-full" style={{ background: colors.get(s.name) ?? OTHER_VAR }} />
                   <span className="truncate">{s.name}</span>
@@ -99,17 +99,17 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
             </motion.li>
           ))}
         </ul>
-        <div className="mt-2 grid grid-cols-[160px_1fr_72px] gap-3 px-2 text-2xs text-ink-3"><span /><span className="flex justify-between"><span>▼ cheaper</span><span>pricier ▲</span></span><span /></div>
+        <div className="mt-2 grid grid-cols-[160px_minmax(0,1fr)_72px] gap-3 px-2 text-2xs text-ink-3"><span /><span className="flex justify-between"><span>▼ cheaper</span><span>pricier ▲</span></span><span /></div>
       </section>
 
       <Segments stats={stats} colors={colors} onPick={setActive} />
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         {brand && (
           <section className="card p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-semibold tracking-tight">{brand.name}</h2>
                   {brand.isReference && <Badge tone="accent" size="xs">Reference</Badge>}
                   {brand.segment && <Badge tone="neutral" size="xs">{brand.segment.label}</Badge>}

@@ -54,7 +54,7 @@ export function ComparisonsIndex({ cards }: { cards: Card[] }) {
     );
   }
   return (
-    <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {cards.map((c, i) => {
         const max = Math.max(...c.bars.map((b) => b.unit), 1);
         const min = Math.min(...c.bars.map((b) => b.unit), max);

@@ -91,9 +91,9 @@ export function ReportsView({ groups, families, brands, marketplaces, definition
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-6">
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {TYPES.map((x, i) => {
             const on = x.value === type;
             return (

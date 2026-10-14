@@ -18,7 +18,10 @@ import * as s from "@/server/db/schema";
 import { HttpError } from "@/server/errors";
 import { computeInsights } from "@/server/insights/engine";
 import { checkBudget, pauseProvider } from "@/server/monitoring/budget";
+import { writeHeartbeat } from "@/server/monitoring/heartbeat";
+import { HEARTBEAT_KEY } from "@/server/monitoring/queue";
 import { runRefreshJob } from "@/server/monitoring/refresh";
+import { requestManualRefresh } from "@/server/monitoring/scheduler";
 import { getProvider } from "@/server/providers";
 import type { DemoProvider } from "@/server/providers/demo";
 import { buildReport } from "@/server/reports/build";
@@ -144,6 +147,28 @@ describe("monitoring", () => {
     expect(again).toBe(after);
     const fresh = await listVariantRows(ctx.workspace.id);
     expect(fresh.every((v) => v.consecutiveFailures === 0 && v.lastSuccessAt)).toBe(true);
+  });
+
+  it("runs a manual refresh inline when no queue worker is alive, and queues it when one is", async () => {
+    const rows = await listVariantRows(ctx.workspace.id);
+    const [l] = await db.select().from(s.listings).where(eq(s.listings.id, rows[0]!.listingId));
+    const listingRows = [{ id: l!.id, provider: l!.provider, marketplace: l!.marketplace }];
+    if (redisConfigured()) await getRedis().del(HEARTBEAT_KEY);
+
+    // No heartbeat: a queued job would never run, so the refresh happens now.
+    const [inline] = await requestManualRefresh({ workspaceId: ctx.workspace.id, userId: ctx.user.id, listingRows });
+    const [done] = await db.select().from(s.monitoringJobs).where(eq(s.monitoringJobs.id, inline!));
+    expect(done!.status).toBe("succeeded");
+
+    if (redisConfigured()) {
+      // A live worker: the job goes to the queue instead (the minute-bucketed key would dedupe, so use another listing).
+      await writeHeartbeat("queue", 90);
+      const [l2] = await db.select().from(s.listings).where(eq(s.listings.id, rows[1]!.listingId));
+      const [queued] = await requestManualRefresh({ workspaceId: ctx.workspace.id, userId: ctx.user.id, listingRows: [{ id: l2!.id, provider: l2!.provider, marketplace: l2!.marketplace }] });
+      const [job] = await db.select().from(s.monitoringJobs).where(eq(s.monitoringJobs.id, queued!));
+      expect(job!.status).toBe("queued");
+      await getRedis().del(HEARTBEAT_KEY);
+    }
   });
 
   it("retries transient failures and backs off on the final attempt", async () => {

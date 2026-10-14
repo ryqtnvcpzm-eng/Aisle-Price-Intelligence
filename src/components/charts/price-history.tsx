@@ -271,7 +271,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
             <span className="text-xs">Aisle never fills gaps with invented prices — try a longer range.</span>
           </div>
         ) : (
-          <motion.div className="chart-reveal h-full" animate={{ opacity: isPlaceholderData ? 0.45 : 1 }} transition={{ duration: 0.2 }} role="img" aria-label={`Price history for ${visible.map((v) => v.name).join(", ")}. Table view available.`}>
+          <motion.div className="chart-reveal h-full [overflow-x:clip]" animate={{ opacity: isPlaceholderData ? 0.45 : 1 }} transition={{ duration: 0.2 }} role="img" aria-label={`Price history for ${visible.map((v) => v.name).join(", ")}. Table view available.`}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={rows} margin={{ top: 8, right: 16, bottom: 0, left: 4 }}>
                 <CartesianGrid vertical={false} />

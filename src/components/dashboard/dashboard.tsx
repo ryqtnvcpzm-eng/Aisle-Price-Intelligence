@@ -128,7 +128,7 @@ export function Dashboard({ data, insights, userName, renderedAt }: { data: Dash
       </motion.section>
 
       {/* Trend + what changed */}
-      <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <motion.section {...appear(2)} className="card p-5">
           <SectionHeader title="Portfolio price index" description="Median price vs. 30 days ago (100 = then). Same listings, one axis." action={<ButtonLink href="/history" variant="ghost" size="sm">History <ArrowRight className="size-3.5" /></ButtonLink>} />
           <div className="mt-4">
@@ -157,7 +157,7 @@ export function Dashboard({ data, insights, userName, renderedAt }: { data: Dash
       </div>
 
       {/* Movers & attention */}
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         <motion.section {...appear(4)} className="card p-5">
           <SectionHeader title="Largest decreases" description="Last 24 hours" />
           <MoverList movers={data.movers.down} empty="No decreases in the last 24 hours." />
@@ -187,7 +187,7 @@ export function Dashboard({ data, insights, userName, renderedAt }: { data: Dash
       </div>
 
       {/* Brands + activity */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <motion.section {...appear(7)} className="card p-5">
           <SectionHeader title="Brands you monitor" description="Tracked listings only — not market share" action={<ButtonLink href="/brands" variant="ghost" size="sm">Brands <ArrowRight className="size-3.5" /></ButtonLink>} />
           <table className="mt-3 w-full text-sm">

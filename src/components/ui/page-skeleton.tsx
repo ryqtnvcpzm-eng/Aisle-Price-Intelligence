@@ -24,7 +24,7 @@ export function PageSkeleton({ body = "list", wide }: { body?: Body; wide?: bool
               </div>
             ))}
           </div>
-          <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <div className="skeleton h-[360px] rounded-[18px]" />
             <div className="skeleton h-[360px] rounded-[18px]" />
           </div>
@@ -76,7 +76,7 @@ export function PageSkeleton({ body = "list", wide }: { body?: Body; wide?: bool
         </>
       )}
       {body === "settings" && (
-        <div className="grid gap-8 md:grid-cols-[180px_1fr]">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-[180px_minmax(0,1fr)]">
           <div className="hidden space-y-3 md:block">{Array.from({ length: 8 }, (_, i) => <div key={i} className="skeleton h-4 w-28 rounded-[6px]" />)}</div>
           <div className="space-y-6">{Array.from({ length: 3 }, (_, i) => <div key={i} className="skeleton h-[200px] rounded-[18px]" />)}</div>
         </div>

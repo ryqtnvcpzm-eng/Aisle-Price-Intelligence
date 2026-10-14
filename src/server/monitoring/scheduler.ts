@@ -9,6 +9,7 @@ import { logger } from "../logger";
 import { getProvider, type ProviderId } from "../providers";
 import { checkBudget } from "./budget";
 import { redisConfigured } from "../redis";
+import { readHeartbeat } from "./heartbeat";
 import { getQueue } from "./queue";
 import { runRefreshJob } from "./refresh";
 
@@ -80,6 +81,12 @@ export async function scanDueListings(now = new Date()): Promise<{ enqueued: num
 }
 
 /** Create the job row (idempotent) and hand it to the queue. Returns false for duplicates. */
+/** The BullMQ worker beats every 30 s; treat it as alive if it reported within two minutes. */
+async function queueWorkerAlive(now = Date.now()) {
+  const hb = await readHeartbeat();
+  return Boolean(hb && hb.mode === "queue" && now - new Date(hb.at).getTime() < 120_000);
+}
+
 export async function enqueueRefresh(opts: {
   kind: "scheduled" | "manual" | "import" | "backfill";
   provider: ProviderId;
@@ -110,6 +117,13 @@ export async function enqueueRefresh(opts: {
   if (!redisConfigured()) {
     // Scheduled mode: manual refreshes run immediately; scheduled ones wait for `worker:once`.
     if (opts.inlineFallback) await runRefreshJob(row.id, { attempt: 1, final: true });
+    return row.id;
+  }
+  if (opts.inlineFallback && !(await queueWorkerAlive())) {
+    // Redis is configured but no worker is consuming the queue (it's down, or never started):
+    // a queued manual refresh would sit there, so run it now instead of making the user wait.
+    logger.info({ job: row.id }, "no live queue worker; running manual refresh inline");
+    await runRefreshJob(row.id, { attempt: 1, final: true });
     return row.id;
   }
   try {

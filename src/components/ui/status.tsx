@@ -24,7 +24,7 @@ export function Freshness({ state, lastSuccessAt, providerUpdatedAt, observedAt,
     <div className="space-y-1">
       <div className="font-semibold">{copy.label}</div>
       <div className="opacity-80">{copy.description}</div>
-      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 opacity-90">
+      <dl className="mt-1 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 opacity-90">
         <dt className="opacity-70">Aisle checked</dt>
         <dd>{relativeTime(lastSuccessAt)}</dd>
         <dt className="opacity-70">Provider updated</dt>

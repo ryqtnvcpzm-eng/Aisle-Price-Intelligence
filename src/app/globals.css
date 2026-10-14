@@ -253,6 +253,9 @@
     border-color: var(--line);
   }
   html {
+    /* Guard: stray overflow is clipped instead of widening the mobile layout viewport, which would
+       push the fixed tab bar below the visible screen. `clip` (unlike `hidden`) keeps sticky working. */
+    overflow-x: clip;
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
