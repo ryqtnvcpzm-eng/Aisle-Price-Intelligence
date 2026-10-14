@@ -3,7 +3,7 @@ import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { logActivity } from "../activity";
 import { db } from "../db/client";
-import { alertEvents, alertRules, comparisonGroups, notifications, variants } from "../db/schema";
+import { alertEvents, alertRules, comparisonGroups, notificationDeliveries, notifications, variants } from "../db/schema";
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
 import { deliverAlertEvent } from "./deliver";
@@ -115,8 +115,10 @@ export async function sendTest(ctx: AppContext, id: string) {
     .insert(alertEvents)
     .values({ ruleId: rule.id, workspaceId: ctx.workspace.id, headline: `Test: ${rule.name}`, detail: "This is a test notification. No price event occurred.", dedupeKey: `test:${Date.now()}`, isTest: true })
     .returning();
-  const channels = await deliverAlertEvent(ev!, rule, { quiet: false });
-  return { channels };
+  // A test only ever goes to the person who asked for it.
+  const channels = await deliverAlertEvent(ev!, rule, { quiet: false, testRecipient: { userId: ctx.user.id, email: ctx.user.email } });
+  const [delivery] = await db.select().from(notificationDeliveries).where(eq(notificationDeliveries.alertEventId, ev!.id));
+  return { channels, email: delivery ? { status: delivery.status, reason: delivery.lastError } : null };
 }
 
 export async function listEvents(workspaceId: string, limit = 100) {

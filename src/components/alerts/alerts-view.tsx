@@ -21,6 +21,8 @@ import { Select } from "../ui/select";
 import { SimulatedBadge } from "../ui/status";
 import { Switch } from "../ui/switch";
 import { Tabs } from "../ui/tabs";
+import type { ProtectionStatus } from "@/server/alerts/protection";
+import { BrandProtection } from "./brand-protection";
 
 interface Rule {
   id: string;
@@ -39,6 +41,7 @@ interface Rule {
   family_title: string | null;
   variant_label: string | null;
   event_count: number;
+  managed_key: string | null;
 }
 interface Event {
   id: string;
@@ -66,9 +69,12 @@ const TYPES: { value: string; label: string; family: string; needs?: "threshold"
   { value: "stale_data", label: "Hasn't refreshed in a while", family: "Data quality", needs: "hours", scope: "any" },
   { value: "monitoring_failures", label: "Repeated monitoring failures", family: "Data quality", needs: "failures", scope: "any" },
   { value: "quota_exhausted", label: "Provider allowance exhausted", family: "Data quality", scope: "workspace" },
+  { value: "price_leadership_change", label: "The lowest-price brand changes", family: "Competitive", scope: "group" },
+  { value: "reference_out_of_stock", label: "Your listing goes out of stock", family: "Competitive", scope: "group" },
+  { value: "rival_drop_5pct", label: "A rival drops its price by 5%+", family: "Competitive", scope: "group" },
 ];
 
-export function AlertsView({ rules, events, variants, groups, emailConfigured }: { rules: Rule[]; events: Event[]; variants: { id: string; name: string; currency: string; price: number | null }[]; groups: { id: string; name: string }[]; emailConfigured: boolean }) {
+export function AlertsView({ protection, rules, events, variants, groups, emailConfigured }: { protection: ProtectionStatus; rules: Rule[]; events: Event[]; variants: { id: string; name: string; currency: string; price: number | null }[]; groups: { id: string; name: string }[]; emailConfigured: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [tab, setTab] = useState<"rules" | "history">(params.get("event") ? "history" : "rules");
@@ -97,8 +103,9 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
   }
   async function test(r: Rule) {
     try {
-      const res = await api<{ channels: string[] }>(`/api/alerts/rules/${r.id}/test`, { method: "POST" });
-      toast.success("Test notification sent", { description: `Delivered via ${res.channels.join(" and ").replace("in_app", "in-app")}.` });
+      const res = await api<{ channels: string[]; email: { status: string; reason: string | null } | null }>(`/api/alerts/rules/${r.id}/test`, { method: "POST" });
+      const emailNote = res.email ? (res.email.status === "sent" ? " Email sent to you." : res.email.status === "pending" ? " Email queued for retry." : ` Email not sent: ${res.email.reason ?? "unknown reason"}`) : "";
+      toast.success("Test notification sent", { description: `Delivered in-app.${emailNote}` });
       router.refresh();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "Test failed.");
@@ -106,11 +113,15 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
   }
 
   const ruleName = useMemo(() => new Map(rules.map((r) => [r.id, r.name])), [rules]);
+  // Protect My Brand rules are managed as a pack in the section above, not one by one.
+  const ownRules = rules.filter((r) => !r.managed_key);
+  const managedCount = rules.length - ownRules.length;
 
   return (
     <div className="space-y-5">
+      <BrandProtection status={protection} />
       <div className="flex items-center justify-between gap-3">
-        <Tabs value={tab} onChange={setTab} tabs={[{ value: "rules", label: "Rules", count: rules.length }, { value: "history", label: "History", count: events.length }]} className="flex-1" />
+        <Tabs value={tab} onChange={setTab} tabs={[{ value: "rules", label: "Rules", count: ownRules.length }, { value: "history", label: "History", count: events.length }]} className="flex-1" />
         <Button variant="primary" onClick={() => { setPrefill({}); setEditing("new"); }}>
           <Plus className="size-4" /> New alert
         </Button>
@@ -119,11 +130,11 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
       <AnimatePresence mode="wait" initial={false}>
         {tab === "rules" ? (
           <motion.div key="rules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {!rules.length ? (
+            {!ownRules.length ? (
               <EmptyState icon={<Bell />} title="No alerts yet" description="Get told when a competitor undercuts you, a price hits a threshold, or a listing goes out of stock." action={<Button variant="primary" onClick={() => setEditing("new")}>Create your first alert</Button>} />
             ) : (
               <ul className="card divide-y divide-[var(--hairline)]">
-                {rules.map((r, i) => {
+                {ownRules.map((r, i) => {
                   const t = TYPES.find((x) => x.value === r.type);
                   return (
                     <motion.li key={r.id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring.gentle, delay: staggerDelay(i) }} className="flex items-center gap-4 px-5 py-4">
@@ -159,7 +170,8 @@ export function AlertsView({ rules, events, variants, groups, emailConfigured }:
                 })}
               </ul>
             )}
-            <p className="mt-3 text-xs text-ink-3">Alerts from simulated demo data appear in-app only — they’re never emailed. Use “Send test notification” to try delivery.{emailConfigured ? "" : " Email isn't configured (RESEND_API_KEY), so alerts are in-app."}</p>
+            {managedCount > 0 && <p className="mt-3 text-xs text-ink-3">Plus {managedCount} Protect My Brand rule{managedCount === 1 ? "" : "s"}, managed as one pack above.</p>}
+            <p className="mt-3 text-xs text-ink-3">Alerts from simulated demo data appear in-app only — they’re never emailed. Use “Send test notification” to try delivery.{emailConfigured ? "" : " Email isn't set up yet (Settings → Notifications), so alerts are in-app."}</p>
           </motion.div>
         ) : (
           <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -298,7 +310,7 @@ function RuleDialog({ open, onOpenChange, rule, prefill, variants, groups, email
           <label className="flex items-center justify-between gap-3 text-sm">
             <span>
               Also email me
-              {!emailConfigured && <span className="block text-2xs text-ink-3">Email provider not configured — in-app only for now.</span>}
+              {!emailConfigured && <span className="block text-2xs text-ink-3">Email isn't set up — in-app only for now. See Settings → Notifications.</span>}
             </span>
             <Switch checked={email} onCheckedChange={setEmail} label="Email notifications" disabled={!emailConfigured} />
           </label>

@@ -345,7 +345,7 @@ async function persistCandidate(c: AlertCandidate, timeZone: string) {
   if (!ev) return null;
   await db.update(alertRules).set({ lastTriggeredAt: now }).where(eq(alertRules.id, c.rule.id));
   c.rule.lastTriggeredAt = now;
-  await deliverAlertEvent(ev, c.rule, { quiet: inQuietHours(c.rule, timeZone, now) });
+  await deliverAlertEvent(ev, c.rule, { quiet: inQuietHours(c.rule, timeZone, now), timeZone });
   return ev;
 }
 

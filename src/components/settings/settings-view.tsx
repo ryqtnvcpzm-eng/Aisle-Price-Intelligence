@@ -21,6 +21,7 @@ import { Segmented } from "../ui/segmented";
 import { Select } from "../ui/select";
 import { Switch } from "../ui/switch";
 import { usePrefs, type ThemePref } from "../shell/preferences";
+import { NotificationSettings, type DeliveryRow } from "./notification-settings";
 
 const SECTIONS = [
   { id: "profile", label: "Profile", icon: User },
@@ -39,7 +40,7 @@ const SECTIONS = [
 interface Props {
   user: { name: string; email: string };
   role: string;
-  workspace: { name: string; defaultMarketplace: string; defaultCurrency: string | null; defaultBasis: string; timeZone: string; settings: { defaultIntervalMinutes: number; digest: string; emailAlerts: boolean; exportIncludeMethodology: boolean; significantChangePct: number; marketplaceIntervals?: Record<string, number> } };
+  workspace: { name: string; defaultMarketplace: string; defaultCurrency: string | null; defaultBasis: string; timeZone: string; settings: { defaultIntervalMinutes: number; digest: string; emailAlerts: boolean; emailBriefing?: boolean; exportIncludeMethodology: boolean; significantChangePct: number; marketplaceIntervals?: Record<string, number> } };
   providers: ProviderInfo[];
   verification: Partial<Record<string, string | null>>;
   mode: "demo" | "live";
@@ -47,9 +48,11 @@ interface Props {
   budget: BudgetSummary;
   jobs: { id: string; kind: string; status: string; provider: string; marketplace: string; listings: number; observations: number; tokens: number; createdAt: string; error: string | null }[];
   integrations: { email: boolean; ai: boolean; retentionDays: number; shortLinks: boolean };
+  email: { mode: "live" | "dry_run" | "not_configured"; from: string; reason: string | null };
+  deliveries: DeliveryRow[];
 }
 
-export function SettingsView({ user, role, workspace, providers, verification, mode, active, budget, jobs, integrations }: Props) {
+export function SettingsView({ user, role, workspace, providers, verification, mode, active, budget, jobs, integrations, email, deliveries }: Props) {
   const router = useRouter();
   const { theme, setTheme, reducedTransparency, setReducedTransparency, sidebarCollapsed, setSidebarCollapsed } = usePrefs();
   const [name, setName] = useState(workspace.name);
@@ -107,8 +110,7 @@ export function SettingsView({ user, role, workspace, providers, verification, m
         </Section>
 
         <Section id="notifications" title="Notifications">
-          <Row label="Digest" hint="A summary of real (non-simulated) alert events." control={<Segmented ariaLabel="Digest" size="sm" value={workspace.settings.digest} onChange={(v) => setSetting("digest", v)} options={[{ value: "off", label: "Off" }, { value: "daily", label: "Daily" }, { value: "weekly", label: "Weekly" }]} />} />
-          <Row label="Email delivery" hint={integrations.email ? "Transactional email is configured." : "Set RESEND_API_KEY to enable email. In-app notifications always work."} control={<Switch checked={workspace.settings.emailAlerts && integrations.email} onCheckedChange={(v) => setSetting("emailAlerts", v)} disabled={!integrations.email} label="Email alerts" />} />
+          <NotificationSettings email={email} settings={workspace.settings} deliveries={deliveries} canEdit={canEdit} userEmail={user.email} onSetting={setSetting} />
         </Section>
 
         <Section id="providers" title="Data providers">
