@@ -60,8 +60,9 @@ export async function upsertListing(conn: Conn, product: ProviderProduct, provid
 }
 
 export interface ObservationMeta {
-  provider: ProviderId;
-  source: "poll" | "import" | "backfill" | "manual";
+  /** Data provider, or "capture" for prices the owner captured from a product page. */
+  provider: ProviderId | "capture";
+  source: "poll" | "import" | "backfill" | "manual" | "user-capture";
   requestedAt: Date | null;
   providerUpdatedAt: Date | null;
   isSimulated: boolean;
@@ -101,10 +102,13 @@ export async function writeObservation(conn: Conn, listingId: string, marketplac
     .returning({ id: priceObservations.id });
 
   const [prev] = await conn
-    .select({ priceMinor: listings.currentPriceMinor, lastObservedAt: listings.lastObservedAt, availability: listings.availability })
+    .select({ priceMinor: listings.currentPriceMinor, lastObservedAt: listings.lastObservedAt, availability: listings.availability, currentIsSimulated: listings.currentIsSimulated, isSimulated: listings.isSimulated })
     .from(listings)
     .where(eq(listings.id, listingId));
-  const isNewer = !prev?.lastObservedAt || prev.lastObservedAt.getTime() <= snap.observedAt.getTime();
+  // Source-aware: a simulated reading never replaces a verified current price (e.g. one the owner captured).
+  const prevSimulated = prev ? (prev.currentIsSimulated ?? prev.isSimulated) : true;
+  const outranked = meta.isSimulated && !prevSimulated;
+  const isNewer = !outranked && (!prev?.lastObservedAt || prev.lastObservedAt.getTime() <= snap.observedAt.getTime());
   const changed = Boolean(prev && prev.lastObservedAt && prev.priceMinor !== snap.priceMinor);
   if (isNewer) {
     await conn
@@ -118,11 +122,13 @@ export async function writeObservation(conn: Conn, listingId: string, marketplac
         buyBoxSellerId: sellerId,
         buyBoxIsAmazon: snap.seller?.isAmazon ?? null,
         lastObservedAt: snap.observedAt,
+        currentSource: meta.source,
+        currentIsSimulated: meta.isSimulated,
         ...(changed ? { lastPriceChangeAt: snap.observedAt } : {}),
       })
       .where(eq(listings.id, listingId));
   }
-  return { inserted: inserted.length > 0, changed: isNewer && changed, previousPriceMinor: prev?.priceMinor ?? null, previousAvailability: prev?.availability ?? null };
+  return { inserted: inserted.length > 0, observationId: inserted[0]?.id ?? null, changed: isNewer && changed, previousPriceMinor: prev?.priceMinor ?? null, previousAvailability: prev?.availability ?? null };
 }
 
 /**

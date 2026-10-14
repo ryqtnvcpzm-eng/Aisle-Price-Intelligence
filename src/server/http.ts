@@ -9,7 +9,7 @@ type Handler<C> = (req: NextRequest, ctx: C) => Promise<Response | unknown>;
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** Reject cross-site state-changing requests (CSRF defence in addition to SameSite cookies). */
-function assertSameOrigin(req: NextRequest) {
+export function assertSameOrigin(req: NextRequest) {
   if (!MUTATING.has(req.method)) return;
   const origin = req.headers.get("origin");
   if (!origin) return; // non-browser clients (curl, tests) don't send Origin; auth cookie is still required.
@@ -45,19 +45,24 @@ export function handle<C = unknown>(fn: Handler<C>) {
       if (result instanceof Response) return result;
       return NextResponse.json(result ?? { ok: true });
     } catch (e) {
-      if (e instanceof HttpError) {
-        return NextResponse.json({ error: { message: e.message, code: e.code ?? "error" } }, { status: e.status });
-      }
-      if (e instanceof ZodError) {
-        return NextResponse.json(
-          { error: { message: "Some fields need attention.", code: "invalid_input", issues: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) } },
-          { status: 400 },
-        );
-      }
-      logger.error({ err: e, path: req.nextUrl.pathname, method: req.method, ms: Date.now() - started }, "unhandled route error");
-      return NextResponse.json({ error: { message: "Something went wrong on our side. It's been logged.", code: "internal" } }, { status: 500 });
+      return errorResponse(e, req, started);
     }
   };
+}
+
+/** The JSON error shape every route returns; unexpected errors are logged, never echoed. */
+export function errorResponse(e: unknown, req: NextRequest, started = Date.now()) {
+  if (e instanceof HttpError) {
+    return NextResponse.json({ error: { message: e.message, code: e.code ?? "error" } }, { status: e.status });
+  }
+  if (e instanceof ZodError) {
+    return NextResponse.json(
+      { error: { message: "Some fields need attention.", code: "invalid_input", issues: e.issues.map((i) => ({ path: i.path.join("."), message: i.message })) } },
+      { status: 400 },
+    );
+  }
+  logger.error({ err: e, path: req.nextUrl.pathname, method: req.method, ms: Date.now() - started }, "unhandled route error");
+  return NextResponse.json({ error: { message: "Something went wrong on our side. It's been logged.", code: "internal" } }, { status: 500 });
 }
 
 export async function readJson<T>(req: NextRequest, parse: (v: unknown) => T): Promise<T> {

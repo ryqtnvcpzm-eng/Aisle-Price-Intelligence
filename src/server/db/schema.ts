@@ -49,7 +49,7 @@ export const itemStatus = pgEnum("comparison_item_status", ["confirmed", "sugges
 export const jobKind = pgEnum("job_kind", ["scheduled", "manual", "import", "backfill"]);
 export const jobStatus = pgEnum("job_status", ["queued", "running", "succeeded", "partial", "failed", "skipped"]);
 export const requestStatus = pgEnum("provider_request_status", ["ok", "error", "rate_limited", "quota_exhausted", "auth_error", "timeout"]);
-export const observationSource = pgEnum("observation_source", ["poll", "import", "backfill", "manual"]);
+export const observationSource = pgEnum("observation_source", ["poll", "import", "backfill", "manual", "user-capture"]);
 export const alertType = pgEnum("alert_type", [
   "price_below",
   "price_above",
@@ -255,6 +255,13 @@ export const listings = pgTable(
     buyBoxIsAmazon: boolean("buy_box_is_amazon"),
     lastObservedAt: ts("last_observed_at"),
     lastPriceChangeAt: ts("last_price_change_at"),
+    /**
+     * Provenance of the current price: the observation source it came from (e.g. "user-capture")
+     * and whether that observation was simulated. Null on rows written before captures existed,
+     * where the listing-level `isSimulated` applies.
+     */
+    currentSource: observationSource("current_source"),
+    currentIsSimulated: boolean("current_is_simulated"),
     /** The provider's own "data last updated" timestamp. */
     providerUpdatedAt: ts("provider_updated_at"),
     // Monitoring state.
@@ -765,6 +772,64 @@ export const importJobItems = pgTable(
   (t) => [uniqueIndex("import_items_job_pos_uq").on(t.jobId, t.position), index("import_items_job_status_idx").on(t.jobId, t.status)],
 );
 
+// ─── User-driven price capture (bookmarklet) ────────────────────────────────
+
+/**
+ * Personal API tokens for the price-capture bookmarklet. Only a SHA-256 hash is
+ * stored; the token itself is shown once. One active token per user and workspace.
+ */
+export const apiTokens = pgTable(
+  "api_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    purpose: text("purpose").notNull().default("capture"),
+    tokenHash: text("token_hash").notNull(),
+    /** First characters of the token, for recognising it in the UI. Not enough to use it. */
+    prefix: text("prefix").notNull(),
+    lastUsedAt: ts("last_used_at"),
+    revokedAt: ts("revoked_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("api_tokens_hash_uq").on(t.tokenHash), index("api_tokens_user_idx").on(t.userId, t.workspaceId)],
+);
+
+/** Every capture received from the bookmarklet, recorded or not (untracked ASINs, duplicates). */
+export const priceCaptures = pgTable(
+  "price_captures",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id").references(() => user.id, { onDelete: "set null" }),
+    variantId: uuid("variant_id").references(() => variants.id, { onDelete: "set null" }),
+    listingId: uuid("listing_id").references(() => listings.id, { onDelete: "set null" }),
+    observationId: bigint("observation_id", { mode: "number" }),
+    status: text("status").notNull(),
+    asin: text("asin").notNull(),
+    marketplace: text("marketplace").notNull(),
+    title: text("title"),
+    priceMinor: integer("price_minor"),
+    currency: text("currency").notNull(),
+    isDeal: boolean("is_deal").notNull().default(false),
+    selector: text("selector"),
+    variantLabel: text("variant_label"),
+    availabilityText: text("availability_text"),
+    availability: availability("availability").notNull().default("unknown"),
+    url: text("url").notNull(),
+    /** When the page was read, per the browser; validated against the server clock. */
+    capturedAt: ts("captured_at").notNull(),
+    receivedAt: ts("received_at").notNull().defaultNow(),
+  },
+  (t) => [index("captures_ws_time_idx").on(t.workspaceId, t.receivedAt.desc()), index("captures_listing_idx").on(t.listingId, t.capturedAt.desc())],
+);
+
 // ─── Views, reports, activity ───────────────────────────────────────────────
 
 export const savedViews = pgTable(
@@ -849,6 +914,7 @@ export type NotificationDelivery = typeof notificationDeliveries.$inferSelect;
 export type Briefing = typeof briefings.$inferSelect;
 export type ImportJob = typeof importJobs.$inferSelect;
 export type ImportJobItem = typeof importJobItems.$inferSelect;
+export type PriceCapture = typeof priceCaptures.$inferSelect;
 
 /** Short-lived key/value cache used when Redis isn't configured (e.g. serverless free tiers). */
 export const cacheEntries = pgTable("cache_entries", {

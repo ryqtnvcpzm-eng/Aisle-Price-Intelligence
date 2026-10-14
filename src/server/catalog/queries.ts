@@ -34,6 +34,10 @@ export interface VariantRow {
   discoveryStatus: string;
   marketplace: string;
   isSimulated: boolean;
+  /** Source of the current price ("user-capture" when the owner captured it from the product page). */
+  priceSource: string | null;
+  /** Whether the current price itself is simulated (a captured price on a demo listing is not). */
+  priceIsSimulated: boolean;
   brandId: string | null;
   brandName: string | null;
   isReferenceBrand: boolean;
@@ -89,6 +93,7 @@ export async function listVariantRows(workspaceId: string, opts: { familyId?: st
       l.id listing_id, l.asin, l.provider, l.current_price_minor, l.current_price_basis, l.list_price_minor, l.currency, l.availability, l.status,
       s.name seller_name, l.buy_box_is_amazon, l.last_observed_at, l.last_success_at, l.last_failure_at, l.last_error, l.provider_updated_at,
       l.next_check_at, l.check_interval_minutes, l.consecutive_failures, l.last_price_change_at,
+      l.current_source, coalesce(l.current_is_simulated, l.is_simulated) price_is_simulated,
       p24.price_minor p24, p7.price_minor p7, p30.price_minor p30, p90.price_minor p90, ext.lo, ext.hi, ext.n
     from variants v
       join listings l on l.id = v.listing_id
@@ -96,11 +101,11 @@ export async function listVariantRows(workspaceId: string, opts: { familyId?: st
       left join brands b on b.id = f.brand_id
       left join categories c on c.id = f.category_id
       left join sellers s on s.id = l.buy_box_seller_id
-      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.observed_at <= now() - interval '24 hours' and o.observed_at > now() - interval '48 hours' order by o.observed_at desc limit 1) p24 on true
-      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.observed_at <= now() - interval '7 days' and o.observed_at > now() - interval '10 days' order by o.observed_at desc limit 1) p7 on true
-      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.observed_at <= now() - interval '30 days' and o.observed_at > now() - interval '37 days' order by o.observed_at desc limit 1) p30 on true
-      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.observed_at <= now() - interval '90 days' and o.observed_at > now() - interval '100 days' order by o.observed_at desc limit 1) p90 on true
-      left join lateral (select min(price_minor) lo, max(price_minor) hi, count(*)::int n from price_observations o where o.listing_id = l.id) ext on true
+      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated) and o.observed_at <= now() - interval '24 hours' and o.observed_at > now() - interval '48 hours' order by o.observed_at desc limit 1) p24 on true
+      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated) and o.observed_at <= now() - interval '7 days' and o.observed_at > now() - interval '10 days' order by o.observed_at desc limit 1) p7 on true
+      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated) and o.observed_at <= now() - interval '30 days' and o.observed_at > now() - interval '37 days' order by o.observed_at desc limit 1) p30 on true
+      left join lateral (select price_minor from price_observations o where o.listing_id = l.id and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated) and o.observed_at <= now() - interval '90 days' and o.observed_at > now() - interval '100 days' order by o.observed_at desc limit 1) p90 on true
+      left join lateral (select min(price_minor) lo, max(price_minor) hi, count(*)::int n from price_observations o where o.listing_id = l.id and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated)) ext on true
     where v.workspace_id = ${workspaceId} ${archFilter} ${famFilter} ${varFilter}
     order by coalesce(b.is_reference, false) desc, b.name nulls last, f.title, v.label`);
 
@@ -143,6 +148,8 @@ export async function listVariantRows(workspaceId: string, opts: { familyId?: st
       discoveryStatus: r.discovery_status as string,
       marketplace: r.marketplace as string,
       isSimulated: r.is_simulated as boolean,
+      priceSource: (r.current_source as string | null) ?? null,
+      priceIsSimulated: r.price_is_simulated as boolean,
       brandId: (r.brand_id as string | null) ?? null,
       brandName: (r.brand_name as string | null) ?? null,
       isReferenceBrand: r.is_reference as boolean,

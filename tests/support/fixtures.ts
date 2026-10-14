@@ -53,13 +53,18 @@ export async function observe(listingId: string, o: { priceMinor: number | null;
  * Listings are a shared catalog, so observations a test invents would leak into
  * other test files. Remove them and roll each listing back to its newest real observation.
  */
+/** Mark a listing as touched by a test that writes observations through other paths (e.g. captures). */
+export function touchListing(id: string) {
+  touched.add(id);
+}
+
 export async function restoreObservedListings() {
   const ids = [...touched];
   touched.clear();
   if (!ids.length) return;
-  await db.delete(s.priceObservations).where(and(inArray(s.priceObservations.listingId, ids), eq(s.priceObservations.source, "manual")));
+  await db.delete(s.priceObservations).where(and(inArray(s.priceObservations.listingId, ids), inArray(s.priceObservations.source, ["manual", "user-capture"])));
   await db.execute(sql`
-    update listings l set current_price_minor = o.price_minor, current_price_basis = o.price_basis, availability = o.availability, currency = o.currency, last_observed_at = o.observed_at
+    update listings l set current_price_minor = o.price_minor, current_price_basis = o.price_basis, availability = o.availability, currency = o.currency, last_observed_at = o.observed_at, current_source = o.source, current_is_simulated = o.is_simulated
     from (select distinct on (listing_id) * from price_observations where listing_id in ${ids} order by listing_id, observed_at desc) o
     where o.listing_id = l.id`);
 }

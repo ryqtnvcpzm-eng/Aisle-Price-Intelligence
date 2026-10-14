@@ -100,9 +100,10 @@ async function loadVariantStates(where: { listingIds?: string[]; variantIds?: st
     where o.listing_id in ${listingIds} and o.price_minor is not null and o.price_minor is distinct from l.current_price_minor and o.observed_at < l.last_observed_at
     order by o.listing_id, o.observed_at desc`);
   const ago = await db.execute<{ listing_id: string; price_minor: number | null }>(sql`
-    select distinct on (listing_id) listing_id, price_minor from price_observations
-    where listing_id in ${listingIds} and observed_at <= now() - interval '24 hours' and observed_at >= now() - interval '48 hours'
-    order by listing_id, observed_at desc`);
+    select distinct on (o.listing_id) o.listing_id, o.price_minor from price_observations o join listings l on l.id = o.listing_id
+    where o.listing_id in ${listingIds} and o.observed_at <= now() - interval '24 hours' and o.observed_at >= now() - interval '48 hours'
+      and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated)
+    order by o.listing_id, o.observed_at desc`);
   const agoMap = new Map(ago.map((a) => [a.listing_id, a.price_minor]));
   const prevMap = new Map(prev.filter((p) => Number(p.rn) === 2).map((p) => [p.listing_id, p]));
   const curMap = new Map(prev.filter((p) => Number(p.rn) === 1).map((p) => [p.listing_id, p]));
@@ -137,7 +138,10 @@ const obsKey = (v: VariantState) => v.observedAt?.toISOString() ?? "none";
 /** Evaluate a single-variant rule against current + previous state. Fires on transitions only. */
 function evaluateVariantRule(rule: AlertRule, v: VariantState): AlertCandidate | null {
   const p = rule.params;
-  const base = { rule, variantId: v.variantId, isSimulated: v.isSimulated };
+  const base = { rule, variantId: v.variantId, isSimulated: v.curIsSimulated ?? v.isSimulated };
+  // A captured (verified) price and a simulated one are never compared with each other.
+  const mixedProvenance = v.prevIsSimulated !== null && v.curIsSimulated !== null && v.prevIsSimulated !== v.curIsSimulated;
+  if (mixedProvenance && ["price_below", "price_above", "pct_drop", "pct_rise"].includes(rule.type)) return null;
   switch (rule.type) {
     case "price_below":
       if (p.thresholdMinor == null || v.price === null) return null;
