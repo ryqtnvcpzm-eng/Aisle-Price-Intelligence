@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { Archive, BarChart3, Bookmark, Check, Download, FileUp, Filter, LayoutGrid, Package, Plus, RefreshCw, Rows3, Search, Star, Trash2, X } from "lucide-react";
+import { Archive, BarChart3, Bookmark, Check, Clock, Download, FileUp, Filter, Hash, LayoutGrid, Package, PencilLine, Plus, RefreshCw, Rows3, Search, Star, Tag, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import { Button } from "../ui/button";
 import { EmptyState } from "../ui/empty-state";
 import { Menu, MenuItem, MenuLabel, MenuSeparator } from "../ui/popover";
 import { Segmented } from "../ui/segmented";
+import { BulkEditDialog, type BulkAction } from "./bulk-edit-dialog";
 import { LibraryGrid } from "./library-grid";
 import { LibraryTable } from "./library-table";
 import { familyStats } from "./library-utils";
@@ -55,6 +56,7 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
   const [selected, setSelected] = useState<Set<string>>(new Set()); // family ids (grid) or variant ids (table)
   const [savedViews, setSavedViews] = useState(initialViews);
   const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ action: BulkAction; familyIds: string[]; variantIds: string[] } | null>(null);
   const highlight = useMemo(() => new Set((params.get("new") ?? "").split(",").filter(Boolean)), [params]);
 
   // Persist the working view per browser so returning feels continuous.
@@ -378,6 +380,8 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
         </LayoutGroup>
       )}
 
+      <BulkEditDialog key={editing ? `${editing.action}-${editing.familyIds.length}-${editing.variantIds.length}` : "closed"} action={editing?.action ?? null} onOpenChange={(v) => !v && setEditing(null)} familyIds={editing?.familyIds ?? []} variantIds={editing?.variantIds ?? []} onDone={() => setSelected(new Set())} />
+
       {/* Floating bulk-action bar */}
       <AnimatePresence>
         {selected.size > 0 && (
@@ -392,6 +396,21 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
             <Button variant="ghost" size="sm" loading={busy === "favorite"} onClick={() => bulk("favorite")}>
               <Star className="size-3.5" /> Favorite
             </Button>
+            <Menu
+              align="center"
+              trigger={
+                <Button variant="ghost" size="sm">
+                  <PencilLine className="size-3.5" /> Edit
+                </Button>
+              }
+            >
+              <MenuLabel>Edit {selectedFamilies.length} product{selectedFamilies.length === 1 ? "" : "s"}</MenuLabel>
+              {(["brand", "frequency", "tags"] as BulkAction[]).map((a) => (
+                <MenuItem key={a} icon={a === "brand" ? <Tag /> : a === "frequency" ? <Clock /> : <Hash />} onSelect={() => setEditing({ action: a, familyIds: selectedFamilies.map((f) => f.familyId), variantIds: selectedVariants.map((v) => v.variantId) })}>
+                  {a === "brand" ? "Change brand…" : a === "frequency" ? "Monitoring frequency…" : "Edit tags…"}
+                </MenuItem>
+              ))}
+            </Menu>
             <Button variant="ghost" size="sm" loading={busy === "archive"} onClick={() => bulk("archive")}>
               <Archive className="size-3.5" /> Archive
             </Button>
