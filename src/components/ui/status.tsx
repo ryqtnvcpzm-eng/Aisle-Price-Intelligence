@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock, FlaskConical, PauseCircle, RefreshCw, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, FlaskConical, MousePointerClick, PauseCircle, RefreshCw, XCircle } from "lucide-react";
 import { FRESHNESS_COPY, relativeTime, type FreshnessState } from "@/lib/freshness";
 import { MARKETPLACES, isMarketplaceCode } from "@/lib/marketplaces";
 import { cn } from "@/lib/cn";
@@ -79,6 +79,42 @@ export function SimulatedBadge({ className, compact, onImage }: { className?: st
       </span>
     </Tooltip>
   );
+}
+
+/** "14 Oct, 2:05 pm" in the viewer's time zone. Only rendered inside tooltips, after hydration. */
+export function captureTime(at: string | number | Date) {
+  return new Date(at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
+/**
+ * A real price the owner captured from the Amazon.in product page with the bookmarklet.
+ * Deliberately the opposite of SimulatedBadge: solid accent fill against Simulated's soft amber.
+ */
+export function CapturedBadge({ at, className, compact, onImage }: { at?: string | null; className?: string; compact?: boolean; onImage?: boolean }) {
+  return (
+    <Tooltip
+      content={
+        <div className="space-y-1">
+          <div className="font-semibold">Captured from Amazon.in{at ? ` · ${captureTime(at)}` : ""}</div>
+          <div className="opacity-80">A real price you captured from the product page with the Aisle bookmarklet{at ? ` ${relativeTime(at)}` : ""}. It shows what the page displayed at that moment — not simulated, and not updated until you capture again.</div>
+        </div>
+      }
+    >
+      <span tabIndex={0} className={cn("outline-none", className)}>
+        <Badge tone="captured" size="xs" className={onImage ? "shadow-[0_1px_2px_rgba(0,0,0,0.18)]" : undefined}>
+          <MousePointerClick className="size-3" aria-hidden />
+          {compact ? "Captured" : "Captured price"}
+        </Badge>
+      </span>
+    </Tooltip>
+  );
+}
+
+/** The one provenance badge for a current price: Captured replaces Simulated, a live provider price needs none. */
+export function PriceOriginBadge({ source, isSimulated, at, compact, onImage, className }: { source: string | null; isSimulated: boolean; at?: string | null; compact?: boolean; onImage?: boolean; className?: string }) {
+  if (source === "user-capture") return <CapturedBadge at={at} compact={compact} onImage={onImage} className={className} />;
+  if (isSimulated) return <SimulatedBadge compact={compact} onImage={onImage} className={className} />;
+  return null;
 }
 
 export function MarketplaceTag({ code, className, showName }: { code: string; className?: string; showName?: boolean }) {

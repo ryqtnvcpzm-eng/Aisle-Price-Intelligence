@@ -2,7 +2,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { Activity, Bell, Check, Database, Download, Globe2, KeyRound, Monitor, Moon, Palette, RefreshCw, Sun, User, Users, X, Sparkles } from "lucide-react";
+import { Activity, Bell, Check, ChevronRight, Database, Download, Globe2, KeyRound, Monitor, Moon, MousePointerClick, Palette, RefreshCw, Sun, User, Users, X, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -30,6 +31,7 @@ const SECTIONS = [
   { id: "monitoring", label: "Monitoring", icon: RefreshCw },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "providers", label: "Data providers", icon: KeyRound },
+  { id: "capture", label: "Price capture", icon: MousePointerClick, href: "/settings/capture" },
   { id: "usage", label: "API usage", icon: Activity },
   { id: "retention", label: "Data retention", icon: Database },
   { id: "insights", label: "Insights", icon: Sparkles },
@@ -76,7 +78,7 @@ export function SettingsView({ user, role, workspace, providers, verification, m
         <ul className="sticky top-20 space-y-0.5">
           {SECTIONS.map((s) => (
             <li key={s.id}>
-              <a href={`#${s.id}`} className="flex h-8 items-center gap-2.5 rounded-[8px] px-2 text-sm text-ink-2 hover:bg-[var(--hairline)] hover:text-ink">
+              <a href={"href" in s ? s.href : `#${s.id}`} className="flex h-8 items-center gap-2.5 rounded-[8px] px-2 text-sm text-ink-2 hover:bg-[var(--hairline)] hover:text-ink">
                 <s.icon className="size-4 text-ink-3" /> {s.label}
               </a>
             </li>
@@ -124,6 +126,17 @@ export function SettingsView({ user, role, workspace, providers, verification, m
           <ul className="divide-y divide-[var(--hairline)]">
             {providers.map((p) => <ProviderRow key={p.id} p={p} verifiedSince={verification[p.id] ?? null} />)}
           </ul>
+        </Section>
+
+        <Section id="capture" title="Price capture" description="Record the real price shown on an Amazon.in product page, one page and one click at a time.">
+          <Link href="/settings/capture" className="flex items-center gap-3 px-5 py-3 hairline-t text-sm transition-colors hover:bg-[var(--hairline)]">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-accent text-accent-ink"><MousePointerClick className="size-4" aria-hidden /></span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">Capture bookmarklet, token and recent captures</span>
+              <span className="block text-xs text-ink-3">Install the bookmarklet, manage your capture token, review what you captured.</span>
+            </span>
+            <ChevronRight className="size-4 text-ink-4" aria-hidden />
+          </Link>
         </Section>
 
         <Section id="usage" title="API usage" description={`Provider: ${active}. Aisle uses only free data sources. Safeguards pause polling when a provider asks it to slow down.`}>

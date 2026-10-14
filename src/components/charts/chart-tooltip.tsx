@@ -9,6 +9,8 @@ export interface TooltipRow {
   value: ReactNode;
   dash?: string;
   muted?: boolean;
+  /** "diamond" marks a captured reading rather than a series line. */
+  marker?: "line" | "diamond";
 }
 
 /**
@@ -23,10 +25,16 @@ export function ChartTooltip({ title, rows, footer }: { title: ReactNode; rows: 
       <div className="space-y-1">
         {rows.map((r) => (
           <div key={r.key} className="flex items-center gap-2">
-            <svg width="14" height="4" aria-hidden className="shrink-0">
-              <line x1="0" y1="2" x2="14" y2="2" stroke={r.color} strokeWidth="2.5" strokeDasharray={r.dash && r.dash !== "0" ? r.dash : undefined} strokeLinecap="round" />
-            </svg>
-            <span className="num font-semibold text-ink">{r.value}</span>
+            {r.marker === "diamond" ? (
+              <svg width="14" height="10" viewBox="-7 -5 14 10" aria-hidden className="shrink-0">
+                <path d="M0 -4.5 L4.5 0 L0 4.5 L-4.5 0 Z" fill={r.color} />
+              </svg>
+            ) : (
+              <svg width="14" height="4" aria-hidden className="shrink-0">
+                <line x1="0" y1="2" x2="14" y2="2" stroke={r.color} strokeWidth="2.5" strokeDasharray={r.dash && r.dash !== "0" ? r.dash : undefined} strokeLinecap="round" />
+              </svg>
+            )}
+            <span className="num shrink-0 whitespace-nowrap font-semibold text-ink">{r.value}</span>
             <span className={r.muted ? "truncate text-ink-4" : "truncate text-ink-3"}>{r.label}</span>
           </div>
         ))}

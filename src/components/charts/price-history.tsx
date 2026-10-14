@@ -16,6 +16,7 @@ import { Button } from "../ui/button";
 import { Skeleton } from "../ui/empty-state";
 import { Popover } from "../ui/popover";
 import { Segmented } from "../ui/segmented";
+import { CapturedBadge, captureTime } from "../ui/status";
 import { ChartTooltip } from "./chart-tooltip";
 
 export type RangeKey = "24h" | "7d" | "30d" | "90d" | "6m" | "1y" | "all" | "custom";
@@ -128,6 +129,7 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
             ...s,
             points: s.points.map((p) => ({ ...p, price: scale(s.variantId, p.price) })),
             raw: s.raw.map((p) => ({ ...p, price: scale(s.variantId, p.price) })),
+            captures: s.captures.map((c) => ({ ...c, price: scale(s.variantId, c.price) })),
             events: s.events.map((e) => ({ ...e, from: scale(s.variantId, e.from), to: scale(s.variantId, e.to) })),
             stats: { ...s.stats, min: scale(s.variantId, s.stats.min), max: scale(s.variantId, s.stats.max), median: scale(s.variantId, s.stats.median), timeWeightedAvg: s.stats.timeWeightedAvg === null ? null : scale(s.variantId, Math.round(s.stats.timeWeightedAvg)) },
           }
@@ -151,6 +153,8 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
         if (!prev || i === a.length - 1 || p.price !== prev.price || p.known !== prev.known) ts.add(p.t);
       });
     }
+    // Captured readings get their own instants so the crosshair can land exactly on them.
+    for (const s of visible) for (const c of s.captures) ts.add(c.t);
     const step = Math.max(HOUR_MS, (win.to - win.from) / 240);
     const first = Math.min(...visible.map((s) => s.points[0]?.t ?? Infinity));
     for (let t = Math.max(win.from, first); t <= win.to; t += step) ts.add(Math.round(t));
@@ -162,7 +166,13 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
     });
   })();
 
-  const allVals = rows.flatMap((r) => visible.map((s) => r[s.variantId])).filter((v): v is number => typeof v === "number");
+  const allVals = [...rows.flatMap((r) => visible.map((s) => r[s.variantId])), ...visible.flatMap((s) => s.captures.map((c) => c.price))].filter((v): v is number => typeof v === "number");
+  // Where each capture sits on the chart: its own price, or (no price on the page) on the series line.
+  const captureMarks = visible.flatMap((s) =>
+    s.captures.map((c) => ({ s, c, y: c.price ?? stepValue(s.points, c.t) })).filter((m): m is typeof m & { y: number } => m.y !== null),
+  );
+  const captureCount = visible.reduce((n, s) => n + s.captures.length, 0);
+  const captureSnapMs = Math.max(HOUR_MS, (win.to - win.from) / 240) / 2;
   const minV = allVals.length ? Math.min(...allVals) : 0;
   const maxV = allVals.length ? Math.max(...allVals) : 1;
   const pad = Math.max(1, (maxV - minV) * 0.12);
@@ -283,14 +293,25 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
                   content={({ active, label }) => {
                     if (!active || label === undefined) return null;
                     const t = Number(label);
+                    const near = visible.flatMap((s) => s.captures.filter((c) => Math.abs(c.t - t) <= captureSnapMs).map((c) => ({ s, c })));
                     return (
                       <ChartTooltip
                         title={fmtFull(t)}
-                        rows={visible
-                          .map((s) => ({ s, v: stepValue(s.points, t) }))
-                          .sort((a, b) => (a.v ?? Infinity) - (b.v ?? Infinity))
-                          .map(({ s, v }) => ({ key: s.variantId, color: colors.get(s.variantId)!.color, dash: colors.get(s.variantId)!.dash, label: s.name, value: v === null ? "unknown" : money(v), muted: v === null }))}
-                        footer="Value in effect at this time · gaps = no trustworthy reading"
+                        rows={[
+                          ...visible
+                            .map((s) => ({ s, v: stepValue(s.points, t) }))
+                            .sort((a, b) => (a.v ?? Infinity) - (b.v ?? Infinity))
+                            .map(({ s, v }) => ({ key: s.variantId, color: colors.get(s.variantId)!.color, dash: colors.get(s.variantId)!.dash, label: s.name, value: v === null ? "unknown" : money(v), muted: v === null })),
+                          ...near.map(({ s, c }) => ({
+                            key: `cap-${s.variantId}-${c.t}`,
+                            color: "var(--accent)",
+                            marker: "diamond" as const,
+                            label: `${s.name} · Captured ${captureTime(c.t)}${c.isDeal ? " · deal" : ""}`,
+                            value: c.price === null ? "no price" : money(c.price),
+                            muted: c.price === null,
+                          })),
+                        ]}
+                        footer={near.length ? "Line: monitored value in effect · ◆ price you captured from the Amazon.in page" : "Value in effect at this time · gaps = no trustworthy reading"}
                       />
                     );
                   }}
@@ -325,6 +346,17 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
                         return <ReferenceDot key={`${s.variantId}-${i}`} x={e.t} y={y} r={e.kind === "out_of_stock" || e.kind === "back_in_stock" ? 4.5 : 3} fill={e.kind === "out_of_stock" ? "var(--chart-surface)" : st.fill} stroke={st.fill} strokeWidth={e.kind === "out_of_stock" ? 2 : 1.5} ifOverflow="hidden" />;
                       }),
                   )}
+                {/* Captured readings: accent diamonds, always shown — they're data, not derived events. */}
+                {captureMarks.map(({ s, c, y }) => (
+                  <ReferenceDot
+                    key={`cap-${s.variantId}-${c.t}`}
+                    x={c.t}
+                    y={y}
+                    r={5}
+                    ifOverflow="hidden"
+                    shape={(props: { cx?: number; cy?: number }) => <CaptureDiamond cx={props.cx} cy={props.cy} hollow={c.price === null} />}
+                  />
+                ))}
                 {rows.length > 40 && !compact && <Brush dataKey="t" height={22} travellerWidth={8} stroke="var(--line-strong)" fill="var(--surface-2)" tickFormatter={fmtTick} />}
               </ComposedChart>
             </ResponsiveContainer>
@@ -333,14 +365,22 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
       </div>
 
       {excluded.length > 0 && <p className="text-xs text-warn">{excluded.length} series priced in another currency ({[...new Set(excluded.map((e) => e.currency))].join(", ")}) aren’t drawn on this axis — Aisle never mixes currencies.</p>}
-      {eventsShown && visible.length > 0 && (
+      {((eventsShown && visible.length > 0) || captureCount > 0) && (
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-2xs text-ink-3">
-          {["decrease", "increase", "out_of_stock", "back_in_stock"].map((k) => (
-            <span key={k} className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full" style={{ background: k === "out_of_stock" ? "transparent" : EVENT_STYLE[k]!.fill, boxShadow: `inset 0 0 0 1.5px ${EVENT_STYLE[k]!.fill}` }} />
-              {EVENT_STYLE[k]!.label}
+          {eventsShown &&
+            visible.length > 0 &&
+            ["decrease", "increase", "out_of_stock", "back_in_stock"].map((k) => (
+              <span key={k} className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: k === "out_of_stock" ? "transparent" : EVENT_STYLE[k]!.fill, boxShadow: `inset 0 0 0 1.5px ${EVENT_STYLE[k]!.fill}` }} />
+                {EVENT_STYLE[k]!.label}
+              </span>
+            ))}
+          {captureCount > 0 && (
+            <span className="flex items-center gap-1.5 font-medium text-accent">
+              <svg width="10" height="10" viewBox="-5 -5 10 10" aria-hidden><path d="M0 -4.5 L4.5 0 L0 4.5 L-4.5 0 Z" fill="var(--accent)" /></svg>
+              Captured by you from Amazon.in ({captureCount}) · not part of the monitored line
             </span>
-          ))}
+          )}
         </div>
       )}
 
@@ -395,14 +435,16 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
                 </thead>
                 <tbody>
                   {visible
-                    .flatMap((s) => s.raw.map((p) => ({ s, p })))
+                    .flatMap((s) => [...s.raw.map((p) => ({ s, p, captured: false })), ...s.captures.map((p) => ({ s, p, captured: true }))])
                     .sort((a, b) => b.p.t - a.p.t)
                     .slice(0, 500)
-                    .map(({ s, p }) => (
-                      <tr key={`${s.variantId}-${p.t}`} className="hairline-t">
+                    .map(({ s, p, captured }) => (
+                      <tr key={`${s.variantId}-${p.t}-${captured ? "c" : "o"}`} className="hairline-t">
                         <td className="num px-3 py-1.5 text-xs text-ink-2">{fmtFull(p.t)}</td>
-                        <td className="px-3 py-1.5 text-xs">{s.name}</td>
-                        <td className="num px-3 py-1.5 text-right text-xs">{p.price === null ? <span className="text-bad">unavailable</span> : money(p.price)}</td>
+                        <td className="px-3 py-1.5 text-xs">
+                          <span className="flex items-center gap-1.5">{s.name}{captured && <CapturedBadge compact at={new Date(p.t).toISOString()} />}</span>
+                        </td>
+                        <td className="num px-3 py-1.5 text-right text-xs">{p.price === null ? <span className={captured ? "text-ink-3" : "text-bad"}>{captured ? "no price on page" : "unavailable"}</span> : money(p.price)}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -414,4 +456,10 @@ export function PriceHistory({ options, initialSelected, colorBy = "brand", defa
       </AnimatePresence>
     </div>
   );
+}
+
+/** A captured reading: a diamond, so it can't be mistaken for an event dot or the line. Hollow when the page showed no price. */
+function CaptureDiamond({ cx, cy, hollow }: { cx?: number; cy?: number; hollow?: boolean }) {
+  if (cx === undefined || cy === undefined) return null;
+  return <path d={`M${cx} ${cy - 6} L${cx + 6} ${cy} L${cx} ${cy + 6} L${cx - 6} ${cy} Z`} fill={hollow ? "var(--chart-surface)" : "var(--accent)"} stroke={hollow ? "var(--accent)" : "var(--chart-surface)"} strokeWidth={hollow ? 2 : 1.5} />;
 }

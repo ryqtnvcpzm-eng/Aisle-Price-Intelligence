@@ -1,6 +1,6 @@
 /** Shared helpers for integration tests: isolated workspaces and deterministic observations. */
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, inArray, sql } from "drizzle-orm";
 import { commitImport, previewImport } from "@/server/catalog/import";
 import { writeObservation } from "@/server/catalog/persist";
 import { db } from "@/server/db/client";

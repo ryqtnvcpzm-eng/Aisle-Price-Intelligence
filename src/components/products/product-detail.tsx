@@ -24,7 +24,7 @@ import { Delta, Price } from "../ui/price";
 import { ProductImage } from "../ui/product-image";
 import { Segmented } from "../ui/segmented";
 import { Select } from "../ui/select";
-import { Freshness, MarketplaceTag, SimulatedBadge, StockBadge } from "../ui/status";
+import { CapturedBadge, Freshness, MarketplaceTag, SimulatedBadge, StockBadge } from "../ui/status";
 import { Switch } from "../ui/switch";
 import { Tabs } from "../ui/tabs";
 import { Tooltip } from "../ui/tooltip";
@@ -51,6 +51,7 @@ export interface LatestObservation {
   sellerIsAmazon: boolean | null;
   sellerName: string | null;
   isSimulated: boolean;
+  source: string;
 }
 
 interface FamilyInfo {
@@ -150,6 +151,9 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
     router.refresh();
   }
 
+  const capturedRows = shown.filter((v) => v.priceSource === "user-capture");
+  const lastCapture = capturedRows.reduce<string | null>((a, v) => (v.lastObservedAt && (!a || v.lastObservedAt > a) ? v.lastObservedAt : a), null);
+  const anySimulated = shown.length ? shown.some((v) => v.priceSource !== "user-capture" && v.priceIsSimulated) : f.isSimulated;
   const lowestPrice = shown.filter((v) => v.priceMinor !== null && v.currency === shown[0]?.currency).sort((a, b) => a.priceMinor! - b.priceMinor!)[0];
   const discoveryCopy = {
     complete: { tone: "good" as const, text: `All ${f.discoveredCount} variations reported by the provider were discovered.` },
@@ -175,7 +179,8 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link href={`/brands?brand=${encodeURIComponent(f.brandName ?? "")}`} className="font-medium text-ink-2 hover:text-accent">{f.brandName ?? "Unbranded"}</Link>
             {f.isReference && <Badge tone="accent" size="xs">Reference brand</Badge>}
-            {f.isSimulated && <SimulatedBadge />}
+            {capturedRows.length > 0 && <CapturedBadge at={lastCapture} />}
+            {anySimulated && <SimulatedBadge />}
             {f.archivedAt && <Badge tone="neutral" size="xs">Archived</Badge>}
           </div>
           <h1 className="mt-1.5 text-balance text-[22px] font-semibold leading-[1.2] tracking-tight sm:text-2xl md:text-[28px] md:leading-tight">{f.title}</h1>
@@ -189,7 +194,7 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
           </div>
           <div className="mt-5 flex flex-wrap items-end gap-6">
             <div>
-              <div className="eyebrow">From</div>
+              <div className="flex items-center gap-1.5"><span className="eyebrow">From</span>{lowestPrice?.priceSource === "user-capture" && <CapturedBadge compact at={lowestPrice.lastObservedAt} />}</div>
               <div className="mt-0.5 text-3xl font-semibold tracking-tight">
                 {lowestPrice ? <AnimatedNumber value={lowestPrice.priceMinor} format={(n) => formatMoney(Math.round(n), lowestPrice.currency ?? "INR")} /> : <span className="text-ink-4">—</span>}
               </div>
@@ -336,6 +341,7 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
                             </td>
                             <td className="px-3 py-3"><QuantityEditor variantId={v.variantId} quantities={v.quantities} label={v.label} /></td>
                             <td className="px-3 py-3 text-right font-semibold">
+                              {v.priceSource === "user-capture" && <CapturedBadge compact at={v.lastObservedAt} className="mb-1 flex justify-end" />}
                               {v.priceMinor !== null && v.currency ? <AnimatedNumber value={v.priceMinor} format={(n) => formatMoney(Math.round(n), v.currency!)} /> : <Price minor={null} currency={null} />}
                               {v.listPriceMinor && v.priceMinor && v.priceMinor < v.listPriceMinor ? <div className="num text-2xs font-normal text-ink-3 line-through decoration-ink-4">{formatMoney(v.listPriceMinor, v.currency ?? "INR")}</div> : null}
                             </td>
@@ -422,7 +428,9 @@ export function ProductDetail({ family: f, variants, observations, rules, focusV
                 <tbody>
                   {variants.map((v) => (
                     <tr key={v.variantId} className="hairline-b">
-                      <td className="px-3 py-2.5 font-medium">{v.label}</td>
+                      <td className="px-3 py-2.5 font-medium">
+                        <span className="flex items-center gap-1.5">{v.label}{v.priceSource === "user-capture" && <CapturedBadge compact at={v.lastObservedAt} />}</span>
+                      </td>
                       <td className="px-3 py-2.5"><Freshness state={v.freshness} variant="badge" lastSuccessAt={v.lastSuccessAt} providerUpdatedAt={v.providerUpdatedAt} observedAt={v.lastObservedAt} nextCheckAt={v.nextCheckAt} /></td>
                       <td className="px-3 py-2.5">
                         <Select ariaLabel={`Interval for ${v.label}`} size="sm" value={v.intervalMinutes === null ? "paused" : String(v.intervalMinutes)} onValueChange={(val) => patchVariant([v.variantId], { intervalMinutes: val === "paused" ? null : Number(val) }, "Schedule updated")} options={[{ value: "60", label: "Hourly" }, { value: "180", label: "3 hours" }, { value: "360", label: "6 hours" }, { value: "720", label: "12 hours" }, { value: "1440", label: "Daily" }, { value: "paused", label: "Paused" }]} />
@@ -496,7 +504,9 @@ function Offers({ variants, observations }: { variants: VariantRow[]; observatio
               const o = observations[v.listingId];
               return (
                 <tr key={v.variantId} className="hairline-b">
-                  <td className="px-3 py-2.5 font-medium">{v.label}</td>
+                  <td className="px-3 py-2.5 font-medium">
+                    <span className="flex items-center gap-1.5">{v.label}{o?.source === "user-capture" && <CapturedBadge compact at={o.observedAt} />}</span>
+                  </td>
                   {types.map((t) => {
                     const val = o?.[t.key] as number | null | undefined;
                     return <td key={t.key} className="num px-3 py-2.5 text-right">{val != null ? formatMoney(val, o!.currency) : <span className="text-2xs text-ink-4">Not reported</span>}</td>;

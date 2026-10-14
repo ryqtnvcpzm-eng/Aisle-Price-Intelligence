@@ -12,7 +12,7 @@ import { spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
 import { Delta } from "../ui/price";
 import { ProductImage } from "../ui/product-image";
-import { Freshness, MarketplaceTag, SimulatedBadge } from "../ui/status";
+import { CapturedBadge, Freshness, MarketplaceTag, SimulatedBadge } from "../ui/status";
 import { familyStats } from "./library-utils";
 
 export function LibraryGrid({ families, selected, onToggle, highlight }: { families: FamilySummary[]; selected: Set<string>; onToggle: (id: string) => void; highlight: Set<string> }) {
@@ -28,6 +28,11 @@ export function LibraryGrid({ families, selected, onToggle, highlight }: { famil
 const Card = memo(function Card({ f, index, selected, anySelected, onToggle, isNew }: { f: FamilySummary; index: number; selected: boolean; anySelected: boolean; onToggle: (id: string) => void; isNew: boolean }) {
   const router = useRouter();
   const s = familyStats(f);
+  // Provenance of the prices on the card: captured variants say so; Simulated only while some price still is.
+  const visible = f.variants.filter((v) => !v.hidden);
+  const captured = visible.filter((v) => v.priceSource === "user-capture");
+  const lastCapture = captured.reduce<string | null>((a, v) => (v.lastObservedAt && (!a || v.lastObservedAt > a) ? v.lastObservedAt : a), null);
+  const anySimulated = visible.length ? visible.some((v) => v.priceSource !== "user-capture" && v.priceIsSimulated) : f.isSimulated;
   const priceText = s.min === null ? "No price" : s.min === s.max ? formatMoney(s.min, s.currency ?? "INR") : `${formatMoney(s.min, s.currency ?? "INR")} – ${formatMoney(s.max, s.currency ?? "INR")}`;
   return (
     <motion.li
@@ -60,7 +65,8 @@ const Card = memo(function Card({ f, index, selected, anySelected, onToggle, isN
             </div>
           </ViewTransition>
           <div className="absolute left-2 top-2 flex gap-1">
-            {f.isSimulated && <SimulatedBadge compact onImage />}
+            {captured.length > 0 && <CapturedBadge compact onImage at={lastCapture} />}
+            {anySimulated && <SimulatedBadge compact onImage />}
             {isNew && <Badge tone="good" size="xs">New</Badge>}
           </div>
         </div>

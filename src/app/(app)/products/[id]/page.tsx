@@ -28,9 +28,12 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
     ? await db.execute<Record<string, unknown>>(sql`
         select distinct on (o.listing_id) o.listing_id, o.observed_at, o.captured_at, o.requested_at, o.provider_updated_at, o.provider, o.currency,
           o.price_minor, o.price_basis, o.amazon_price_minor, o.lowest_new_price_minor, o.list_price_minor, o.deal_price_minor,
-          o.prime_exclusive_price_minor, o.shipping_minor, o.availability, o.seller_is_amazon, s.name seller_name, o.is_simulated
-        from price_observations o left join sellers s on s.id = o.seller_id
-        where o.listing_id in ${listingIds}
+          o.prime_exclusive_price_minor, o.shipping_minor, o.availability, o.seller_is_amazon, s.name seller_name, o.is_simulated, o.source
+        from price_observations o
+        join listings l on l.id = o.listing_id
+        left join sellers s on s.id = o.seller_id
+        -- The observation behind the current price: a later simulated reading never displaces a captured one.
+        where o.listing_id in ${listingIds} and o.is_simulated = coalesce(l.current_is_simulated, l.is_simulated)
         order by o.listing_id, o.observed_at desc`)
     : [];
   const rules = (await listRules(ctx.workspace.id)).filter((r) => rows.some((v) => v.variantId === r.variant_id) || rows.some((v) => v.groups.some((g) => g.id === r.group_id)));
@@ -55,6 +58,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
       sellerIsAmazon: o.seller_is_amazon as boolean | null,
       sellerName: o.seller_name as string | null,
       isSimulated: o.is_simulated as boolean,
+      source: o.source as string,
     };
   }
   return (

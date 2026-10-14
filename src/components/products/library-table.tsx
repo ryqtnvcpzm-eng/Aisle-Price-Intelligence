@@ -14,7 +14,7 @@ import { Checkbox } from "../ui/checkbox";
 import { ColumnsMenu, SortHeader, td, th } from "../ui/data-table";
 import { Delta, Price } from "../ui/price";
 import { ProductImage } from "../ui/product-image";
-import { Freshness, MarketplaceTag, StockBadge } from "../ui/status";
+import { CapturedBadge, Freshness, MarketplaceTag, StockBadge } from "../ui/status";
 import { unitOf } from "./library-utils";
 
 const LABELS: Record<string, string> = { asin: "ASIN", marketplace: "Marketplace", quantity: "Quantity", unit: "Unit price", list: "List price", ch24: "24h", ch7: "7d", ch30: "30d", low: "Lowest seen", stock: "Stock", freshness: "Freshness", seller: "Seller" };
@@ -79,7 +79,12 @@ export function LibraryTable({ families, selected, onSelectionChange }: { famili
         header: ({ column }) => <SortHeader column={column} label="Quantity" hint="Parsed from listing text unless marked as corrected" />,
         cell: ({ row: { original: r } }) => (r.quantities[0] ? <span className="whitespace-nowrap text-xs text-ink-2" title={`${r.quantities[0].confidence}: “${r.quantities[0].matchedText}”`}>{formatQuantity(r.quantities[0])}{r.quantities[0].confidence === "manual" && " ✓"}</span> : <span className="text-xs text-warn">Unknown</span>),
       },
-      { id: "price", accessorKey: "priceMinor", sortUndefined: "last", header: ({ column }) => <SortHeader column={column} label="Price" align="right" />, cell: ({ row: { original: r } }) => <div className="text-right font-semibold"><Price minor={r.priceMinor} currency={r.currency} /></div> },
+      { id: "price", accessorKey: "priceMinor", sortUndefined: "last", header: ({ column }) => <SortHeader column={column} label="Price" align="right" />, cell: ({ row: { original: r } }) => (
+          <div className="flex items-center justify-end gap-1.5 font-semibold">
+            {r.priceSource === "user-capture" && <CapturedBadge compact at={r.lastObservedAt} />}
+            <Price minor={r.priceMinor} currency={r.currency} />
+          </div>
+        ) },
       {
         id: "unit",
         accessorFn: (r) => unitOf(r).minor,

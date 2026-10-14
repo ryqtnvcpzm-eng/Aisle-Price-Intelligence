@@ -13,6 +13,8 @@ export const badgeStyles = cva("inline-flex items-center gap-1 whitespace-nowrap
       down: "bg-down-soft text-down",
       up: "bg-up-soft text-up",
       sim: "bg-sim-soft text-sim",
+      // Solid fill: a price the owner captured. Deliberately unlike the soft amber `sim` tone.
+      captured: "bg-accent text-accent-ink",
       outline: "text-ink-2 shadow-[inset_0_0_0_0.5px_var(--line-strong)]",
     },
     size: { xs: "h-[18px] px-1.5 text-2xs", sm: "h-5 px-2 text-xs", md: "h-6 px-2.5 text-xs" },

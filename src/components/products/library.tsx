@@ -74,6 +74,14 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
     // Restore once on mount; later URL changes are handled by navigation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // "Import this product" from the capture bookmarklet: /products?import=<amazon.in link> opens the
+  // importer prefilled. Nothing is imported until the person confirms in the dialog.
+  const importLink = params.get("import");
+  useEffect(() => {
+    if (!importLink) return;
+    if (/^https:\/\/([a-z0-9-]+\.)?amazon\.in\/dp\/[A-Z0-9]{10}$/.test(importLink)) importer.open(importLink);
+    router.replace("/products", { scroll: false });
+  }, [importLink, importer, router]);
   useEffect(() => {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify({ ...state, q: "" }));
