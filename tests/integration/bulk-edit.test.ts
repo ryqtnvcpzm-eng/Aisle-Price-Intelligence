@@ -61,8 +61,11 @@ describe("bulk edit", () => {
     expect(r.requested).toBe(ids.length);
     expect(r.updated).toBe(ids.length - 1);
     expect(r.skipped).toEqual([expect.objectContaining({ id: ids[0], reason: "Not tracked" })]);
+    const variantRows = await db.select().from(s.variants).where(inArray(s.variants.id, ids.slice(1)));
+    expect(variantRows.every((v) => v.intervalMinutes === 360)).toBe(true);
+    // Listings are shared: each is polled at the most frequent schedule any workspace asks for.
     const listingRows = await db.select().from(s.listings).where(inArray(s.listings.id, rows.slice(1).map((x) => x.listingId)));
-    expect(listingRows.every((l) => l.checkIntervalMinutes === 360)).toBe(true);
+    expect(listingRows.every((l) => l.checkIntervalMinutes !== null && l.checkIntervalMinutes <= 360)).toBe(true);
     const again = await bulkEdit(ctx, { action: "frequency", variantIds: ids.slice(1), intervalMinutes: 360 });
     expect(again.updated).toBe(0);
     expect(again.skipped.every((x) => x.reason === "Already every 6 hours")).toBe(true);

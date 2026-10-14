@@ -231,8 +231,8 @@ export async function listCategories(workspaceId: string) {
 }
 
 export async function listGroups(workspaceId: string) {
-  const rows = await db.execute<{ id: string; name: string; description: string | null; basis: string; marketplace: string | null; reference_brand_id: string | null; item_count: number; brand_count: number; updated_at: Date }>(sql`
-    select g.id, g.name, g.description, g.basis, g.marketplace, g.reference_brand_id, g.updated_at,
+  const rows = await db.execute<{ id: string; name: string; description: string | null; basis: string; marketplace: string | null; reference_brand_id: string | null; managed_by: string | null; item_count: number; brand_count: number; updated_at: Date }>(sql`
+    select g.id, g.name, g.description, g.basis, g.marketplace, g.reference_brand_id, g.managed_by, g.updated_at,
       count(ci.id)::int item_count, count(distinct f.brand_id)::int brand_count
     from comparison_groups g
       left join comparison_items ci on ci.group_id = g.id

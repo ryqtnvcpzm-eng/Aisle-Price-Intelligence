@@ -713,7 +713,7 @@ export const briefings = pgTable(
 
 export interface ImportJobOptions {
   variantPolicy: "pasted_only" | "all_variants";
-  intervalMinutes: number | null;
+  intervalMinutes: 60 | 180 | 360 | 720 | 1440 | null;
   groupId: string | null;
   defaultMarketplace: string;
 }

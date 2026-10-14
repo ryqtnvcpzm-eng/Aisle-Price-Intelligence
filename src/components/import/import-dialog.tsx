@@ -6,7 +6,7 @@ import { AlertCircle, ArrowRight, ChevronDown, ClipboardPaste, ExternalLink, Fil
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { parseManyInputs } from "@/lib/amazon-url";
+import { parseManyInputs, splitInputs } from "@/lib/amazon-url";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/freshness";
@@ -21,18 +21,23 @@ import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Input } from "../ui/input";
 import { ProductImage } from "../ui/product-image";
+import { Segmented } from "../ui/segmented";
 import { Select } from "../ui/select";
 import { SimulatedBadge, StockBadge } from "../ui/status";
 import { Skeleton, SuccessCheck } from "../ui/empty-state";
 import { useApp } from "../shell/app-context";
 import type { ImportPreview, PreviewFamily } from "@/server/catalog/import";
 
-type Phase = "input" | "loading" | "preview" | "saving" | "done";
+type Phase = "input" | "loading" | "preview" | "saving" | "done" | "bulk";
 
 interface GroupRow {
   id: string;
   name: string;
+  managed_by: string | null;
 }
+
+/** Above this many links, one lookup isn't enough: the import is queued and processed 25 at a time. */
+const BULK_THRESHOLD = 25;
 
 const INTERVALS = [
   { value: "60", label: "Hourly" },
@@ -60,6 +65,8 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
   const [interval, setIntervalChoice] = useState(String(app.workspace.settings.defaultIntervalMinutes ?? 60));
   const [showOrganize, setShowOrganize] = useState(Boolean(initialGroupId));
   const [result, setResult] = useState<{ familyIds: string[]; variantIds: string[]; groupId: string | null } | null>(null);
+  const [bulkInputs, setBulkInputs] = useState<string[]>([]);
+  const [policy, setPolicy] = useState<"pasted_only" | "all_variants">("pasted_only");
   const abortRef = useRef<AbortController | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +77,30 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
   const shownMp: MarketplaceCode = detectedMp && detectedMp.kind === "listing" ? detectedMp.marketplace : defaultMp;
 
   const { data: groups } = useQuery({ queryKey: ["groups"], queryFn: () => api<{ groups: GroupRow[] }>("/api/groups"), enabled: open });
+  // Managed "vs Market" comparisons fill themselves; products can only be added to your own comparisons.
+  const ownGroups = (groups?.groups ?? []).filter((g) => !g.managed_by);
+  const isBulk = valid.length > BULK_THRESHOLD;
+
+  function startBulkSetup(tokens: string[]) {
+    setBulkInputs(tokens);
+    if (groupChoice === "new") setGroupChoice("none");
+    setPhase("bulk");
+  }
+
+  async function startBulk() {
+    setPhase("saving");
+    try {
+      const r = await api<{ job: { id: string } }>("/api/import/jobs", {
+        method: "POST",
+        body: { inputs: bulkInputs, variantPolicy: policy, intervalMinutes: interval === "paused" ? null : Number(interval), groupId: groupChoice !== "none" && groupChoice !== "new" ? groupChoice : null, marketplace: mpOverride ?? undefined },
+      });
+      onOpenChange(false);
+      router.push(`/imports/${r.job.id}`);
+    } catch (e) {
+      setPhase("bulk");
+      toast.error(e instanceof ApiError ? e.message : "Couldn't queue the import. Your links are still here.");
+    }
+  }
 
   // Auto-run when opened with a prefilled link (e.g. pasted into ⌘K).
   useEffect(() => {
@@ -153,8 +184,9 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
     e.preventDefault();
     const next = text.trim() ? `${text.trim()}\n${pasted.trim()}` : pasted.trim();
     setText(next);
-    // Parsing begins on paste; lookup follows instantly when the paste looks valid.
-    if (parseManyInputs(next, defaultMp).some((p) => p.kind !== "error")) void lookup(next);
+    // Parsing begins on paste; lookup follows instantly when the paste looks valid (bulk pastes wait for setup).
+    const found = parseManyInputs(next, defaultMp).filter((p) => p.kind !== "error").length;
+    if (found > 0 && found <= BULK_THRESHOLD) void lookup(next);
   }
 
   async function onFile(file: File) {
@@ -163,10 +195,9 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
     const tokens = content.split(/[\s,;"']+/).filter((t) => t.length >= 10);
     const good = tokens.filter((t) => parseManyInputs(t, defaultMp)[0]?.kind !== "error");
     if (!good.length) return toast.error("No Amazon links or ASINs found in that file.");
-    const joined = good.slice(0, 25).join("\n");
-    setText(joined);
-    if (good.length > 25) toast(`Using the first 25 of ${good.length} links to stay within one import.`);
-    void lookup(joined);
+    setText(good.join("\n"));
+    if (good.length > BULK_THRESHOLD) return startBulkSetup(good);
+    void lookup(good.join("\n"));
   }
 
   const title = phase === "done" ? "Monitoring started" : "Add products";
@@ -207,7 +238,8 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
-                            void lookup();
+                            if (isBulk) startBulkSetup(splitInputs(text));
+                            else void lookup();
                           }
                         }}
                         rows={Math.min(6, Math.max(1, text.split("\n").length))}
@@ -233,7 +265,8 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                               const t = await navigator.clipboard.readText();
                               if (t) {
                                 setText(t);
-                                void lookup(t);
+                                if (parseManyInputs(t, defaultMp).filter((p) => p.kind !== "error").length > BULK_THRESHOLD) startBulkSetup(splitInputs(t));
+                                else void lookup(t);
                               }
                             } catch {
                               toast("Press ⌘V / Ctrl+V to paste.");
@@ -381,7 +414,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                               className="w-full"
                               value={groupChoice}
                               onValueChange={setGroupChoice}
-                              options={[{ value: "none", label: "None" }, { value: "new", label: "New comparison…" }, ...(groups?.groups ?? []).map((g) => ({ value: g.id, label: g.name }))]}
+                              options={[{ value: "none", label: "None" }, { value: "new", label: "New comparison…" }, ...ownGroups.map((g) => ({ value: g.id, label: g.name }))]}
                             />
                             {groupChoice === "new" && <Input autoFocus placeholder="e.g. Plant Protein — India" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="mt-1.5 h-8 text-sm" aria-label="New comparison name" />}
                           </div>
@@ -394,6 +427,47 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                       </motion.div>
                     )}
                   </AnimatePresence>
+                </div>
+              </motion.div>
+            )}
+
+            {(phase === "bulk" || (phase === "saving" && !preview)) && (
+              <motion.div key="bulk" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={spring.panel} className="space-y-4">
+                <div className="rounded-[16px] bg-surface p-4 shadow-[var(--shadow-sm),var(--ring-inset)]">
+                  <div className="num text-2xl font-semibold tracking-tight">{bulkInputs.length.toLocaleString("en-IN")} links</div>
+                  <p className="mt-1 text-sm text-ink-2">
+                    That’s more than one lookup can take, so Aisle will import them in the background, {BULK_THRESHOLD} at a time. You’ll see each link’s result — imported, skipped or failed, and why — and can pause, cancel or retry at any point.
+                  </p>
+                  {(() => {
+                    const parsedBulk = parseManyInputs(bulkInputs.join("\n"), defaultMp);
+                    const bad = parsedBulk.filter((p) => p.kind === "error").length;
+                    const dupes = parsedBulk.filter((p) => "duplicateOf" in p && p.duplicateOf).length;
+                    return bad || dupes ? <p className="mt-2 text-xs text-ink-3">{[bad ? `${bad} don’t look like Amazon links and will be reported as failed` : null, dupes ? `${dupes} duplicate${dupes === 1 ? "" : "s"} will be skipped` : null].filter(Boolean).join(" · ")}.</p> : null;
+                  })()}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-ink-2">For each link, import</div>
+                  <Segmented
+                    ariaLabel="Variants to import"
+                    size="sm"
+                    value={policy}
+                    onChange={setPolicy}
+                    options={[
+                      { value: "pasted_only", label: "Just that listing" },
+                      { value: "all_variants", label: "Every size & flavour" },
+                    ]}
+                  />
+                  <p className="text-2xs text-ink-3">{policy === "pasted_only" ? "One provider lookup per link — the fastest and lightest on your provider allowance." : "Also finds and imports each product's other sizes and flavours (more lookups per link)."}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-ink-2" htmlFor="bulk-group">Add to comparison</label>
+                    <Select id="bulk-group" ariaLabel="Comparison group" className="w-full" value={groupChoice === "new" ? "none" : groupChoice} onValueChange={setGroupChoice} options={[{ value: "none", label: "None" }, ...ownGroups.map((g) => ({ value: g.id, label: g.name }))]} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-ink-2" htmlFor="bulk-int">Price checks</label>
+                    <Select id="bulk-int" ariaLabel="Monitoring interval" className="w-full" value={interval} onValueChange={setIntervalChoice} options={INTERVALS} />
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -418,8 +492,17 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
         <div className="px-6 py-4 hairline-t">
           {/* Footer actions swap in step with the body (same sequential timing), never ahead of it. */}
           <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={phase === "preview" || phase === "saving" ? "preview" : phase === "done" ? "done" : "input"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={fadeTween} className="flex items-center gap-2">
-          {phase === "preview" || phase === "saving" ? (
+          <motion.div key={phase === "bulk" || (phase === "saving" && !preview) ? "bulk" : phase === "preview" || phase === "saving" ? "preview" : phase === "done" ? "done" : "input"} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={fadeTween} className="flex items-center gap-2">
+          {phase === "bulk" || (phase === "saving" && !preview) ? (
+            <>
+              <Button variant="ghost" onClick={() => setPhase("input")}>
+                Back
+              </Button>
+              <Button variant="primary" size="lg" className="ml-auto" loading={phase === "saving"} onClick={startBulk}>
+                Import {bulkInputs.length.toLocaleString("en-IN")} links <ArrowRight className="size-4" />
+              </Button>
+            </>
+          ) : phase === "preview" || phase === "saving" ? (
             <>
               <Button variant="ghost" onClick={() => { setPhase("input"); setPreview(null); }}>
                 Back
@@ -452,9 +535,15 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
               <p className="hidden items-center gap-1.5 text-xs text-ink-3 sm:flex">
                 <Info className="size-3.5" /> Data comes from {app.providerLabel}. Aisle never scrapes Amazon.
               </p>
-              <Button variant="primary" size="lg" className="ml-auto" disabled={!valid.length || phase === "loading"} onClick={() => lookup()}>
-                Find products
-              </Button>
+              {isBulk ? (
+                <Button variant="primary" size="lg" className="ml-auto" onClick={() => startBulkSetup(splitInputs(text))}>
+                  Set up bulk import · {valid.length.toLocaleString("en-IN")} links
+                </Button>
+              ) : (
+                <Button variant="primary" size="lg" className="ml-auto" disabled={!valid.length || phase === "loading"} onClick={() => lookup()}>
+                  Find products
+                </Button>
+              )}
             </>
           )}
           </motion.div>

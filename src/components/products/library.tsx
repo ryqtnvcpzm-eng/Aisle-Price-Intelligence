@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { Archive, BarChart3, Bookmark, Check, Clock, Download, FileUp, Filter, Hash, LayoutGrid, Package, PencilLine, Plus, RefreshCw, Rows3, Search, Star, Tag, Trash2, X } from "lucide-react";
+import { Archive, BarChart3, Bookmark, Check, Clock, Download, FileUp, Filter, Hash, History, LayoutGrid, Package, PencilLine, Plus, RefreshCw, Rows3, Search, Star, Tag, Trash2, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -339,6 +339,7 @@ export function Library({ families, savedViews: initialViews }: { families: Fami
         <div className="ml-auto flex items-center gap-1.5">
           <Menu align="end" trigger={<Button variant="ghost" size="icon-sm" aria-label="Import or export"><Download className="size-4" /></Button>}>
             <MenuItem icon={<FileUp />} onSelect={() => importer.open()}>Import Amazon links (CSV)…</MenuItem>
+            <MenuItem icon={<History />} onSelect={() => router.push("/imports")}>Bulk import history</MenuItem>
             <MenuItem icon={<Download />} onSelect={exportCsv}>Export products as CSV</MenuItem>
           </Menu>
           <Segmented<View>

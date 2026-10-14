@@ -19,6 +19,7 @@ import { writeHeartbeat } from "../src/server/monitoring/heartbeat";
 import { runMaintenance } from "../src/server/monitoring/maintenance";
 import { processDueDeliveries } from "../src/server/notifications/email";
 import { generateDueBriefings } from "../src/server/briefing/service";
+import { processImportJobs } from "../src/server/catalog/bulk-import";
 import { runRefreshJob } from "../src/server/monitoring/refresh";
 import { idempotencyKey } from "../src/server/monitoring/scheduler";
 import { getProvider, type ProviderId } from "../src/server/providers";
@@ -69,6 +70,8 @@ async function main() {
     }
   }
   await evaluateSystemAlerts();
+  const imports = await processImportJobs({ maxChunks: 40, timeBudgetMs: 5 * 60_000 });
+  if (imports.chunks) console.log(`bulk imports: processed ${imports.chunks} chunk(s) of up to 25 links`);
   const briefs = await generateDueBriefings(now);
   if (briefs.created) console.log(`Monday Briefing: built ${briefs.created} of ${briefs.workspaces} workspace(s)`);
   const deliveries = await processDueDeliveries(200);
