@@ -78,8 +78,28 @@ This was intended behaviour, but the UI didn't explain it. The dashboard now rea
 - **Tested end to end:** the demo provider, through unit, integration, E2E and this QA.
 - **Not verified live:** the Amazon Creators API adapter is fixture-tested only, so the app labels it **"Not yet verified live"** / **"Live · unverified"** until a real successful response is recorded. See [PROVIDERS.md](PROVIDERS.md).
 
+## Brand intelligence release (features 1–6): two passes
+
+Driven against the production build: desktop light and dark at 1440 × 900, and a phone at 390 × 844 (the mobile E2E uses a Pixel 7 at 412 px). It covered every new screen and dialog, with console errors captured on each step.
+
+| Pass | Finding | Fix |
+|---|---|---|
+| 1 | The My brand cards said "0 listings" for every comparison | The count's correlated subquery rendered an unqualified column. It is now a grouped join, and a test asserts the count |
+| 1 | Briefing index end labels overprinted when both series ended near 100; the y-axis tick "100.4" was clipped | Labels nudge apart when close; ticks are integers |
+| 1 | Premium changes read "▲ 54%" and "up 54%", which is a percent of a percent | Shown in percentage points ("▲ 53.6 pts") |
+| 1 | Drop dates read "11 Sun" | "Sun 11 Oct", in the briefing's time zone |
+| 1 | With many brands, the change-brand dialog pushed the impact preview below the fold | The brand list scrolls on its own |
+| 1 | "Retry failed" was offered when the only failures were invalid links (retrying would error) | Shown only when failures are retryable; the count is in the label |
+| 1 | The briefing's position table scrolled sideways on phones | Stacked layout below `sm` |
+| 2 | React hydration error #418 on `/briefing` | Node's and Chrome's ICU disagree ("Sun 11 Oct" vs "Sun, 11 Oct", "Sept" vs "Sep"). Week and day labels are now built from numeric parts and fixed names, with unit tests |
+| 2 | The mobile E2E caught `/history` at 496 px on a 412 px screen: long managed comparison names widened its select | Selects can't exceed their container |
+| 2 | The "Not yet matched" hint wrapped badly on phones | Hidden below `sm` |
+
+After the fixes: no console errors on any step in any mode, 21 of 21 E2E tests pass (including axe on `/brands`, `/briefing`, `/alerts`, `/imports` and `/settings`), and the overflow check passes on every route.
+
 ## Known limitations
 
 - Headless Chromium uses software rasterization, so blur costs measured here are pessimistic. Real GPUs are faster.
 - Line reveals apply a `clip-path` per path. On very large multi-series charts a single group-level mask would be cheaper.
 - Comparison tables scroll horizontally on tablets rather than reflowing.
+- "Built 12m ago"-style relative times are rendered on the server and the client. Exactly at a rounding boundary they can differ by a minute and React re-renders that text (a warning, not a failure).

@@ -105,10 +105,11 @@ DATABASE_URL="<neon direct url>" pnpm db:seed     # optional demo workspace
 
 The **Hourly monitoring** workflow runs at minute 7 of every hour once `AISLE_SCHEDULED_MONITORING` is `true`. Each run:
 
-1. applies any new migrations;
+1. applies any new migrations (so merging a branch that adds one migrates production within the hour; see [the release checklist](BRAND_INTELLIGENCE.md#production-release-checklist-each-step-needs-explicit-approval));
 2. refreshes listings that are due;
 3. evaluates alerts;
-4. records a heartbeat.
+4. advances queued bulk imports, builds last week's Monday Briefing once, and retries pending emails;
+5. records a heartbeat.
 
 The 03:07 UTC run also sends digests, runs scheduled reports and applies retention.
 
@@ -151,6 +152,8 @@ In-app notifications need no setup. For email:
    - To email anyone, verify a domain in Resend and send from it.
 
 Events based on simulated data are never emailed.
+
+**Settings → Notifications** shows whether email is *live*, in *dry run*, or *not set up*, and why. It has a **Send test email** button that sends to you only, and a delivery log with retry. Set `EMAIL_DRY_RUN=true` on preview or staging deployments to record messages without sending them.
 
 ### Insight briefings
 

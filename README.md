@@ -20,7 +20,11 @@ It runs entirely on **free** infrastructure, and the only data sources it integr
 - **Comparisons:** Table, Visual and Timeline views. A reference brand, premiums against the competitor median, undercut detection, suggestions, drag-to-arrange and a compare tray.
 - **History:** gap-aware step charts (prices are never interpolated), time-weighted statistics and event markers.
 - **Insights:** rule-based findings plus **local, free ML**: robust z-score anomalies, trend regression, promotion-cycle autocorrelation, k-means brand segments and TF-IDF comparison suggestions. Each finding shows its evidence and method.
-- **Alerts and notifications:** rules with deduplication, an in-app inbox, and optional email through Resend's free tier.
+- **My brand:** tell Aisle which brand is yours. It keeps a "{Brand} vs Market" comparison for every category and unit you sell in, and lists what can't be compared yet, and why.
+- **Protect My Brand:** one switch turns on alerts for undercuts, leadership changes, your own stock-outs and rivals' drops of 5% or more.
+- **Monday Briefing:** last week in one read (your position, movers, undercuts, sharp drops, trend, data confidence), stored with an archive.
+- **Bulk work:** import any number of links in the background, 25 at a time, with a result per link. Edit brand, monitoring frequency or tags across many products at once.
+- **Alerts and notifications:** rules with deduplication, an in-app inbox, and optional email through Resend's free tier, with a delivery log and retries.
 - **Reports:** seven report types in CSV, XLSX and PDF, with methodology notes. Simulated data is labelled in every export.
 - **Product polish:** the ⌘K palette, onboarding, saved views, light and dark themes, reduced motion and transparency, and phone, tablet and desktop layouts.
 
@@ -70,8 +74,8 @@ Results at the latest commit:
 |---|---|
 | `pnpm lint` | 0 errors (2 warnings: TanStack Table is incompatible with the React Compiler, expected) |
 | `pnpm typecheck` | Pass |
-| `pnpm test`: unit, components, integration | 119 passed (the integration suite also passes with Redis unset) |
-| `pnpm test:e2e`: Playwright, desktop + mobile, includes axe | 14 passed |
+| `pnpm test`: unit, components, integration | 172 passed (the integration suite also passes with Redis unset) |
+| `pnpm test:e2e`: Playwright, desktop + mobile, includes axe | 21 passed |
 | Production build | Pass, with `REDIS_URL` unset |
 
 Visual and motion QA, with frame capture, runtime metrics and before/after numbers, is documented in [docs/QA_REPORT.md](docs/QA_REPORT.md).
@@ -84,6 +88,7 @@ Visual and motion QA, with frame capture, runtime metrics and before/after numbe
 - [Design system](docs/DESIGN_SYSTEM.md)
 - [Motion spec](docs/MOTION_SPEC.md)
 - [Deployment (free)](docs/DEPLOYMENT.md)
+- [Brand intelligence release: features 1–6, migration and release checklist](docs/BRAND_INTELLIGENCE.md)
 - [QA report](docs/QA_REPORT.md)
 
 ## Limitations
