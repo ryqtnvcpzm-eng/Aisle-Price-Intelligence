@@ -28,16 +28,16 @@ const fmtDate = (t: number) => new Date(t).toLocaleDateString(undefined, { month
  * Portfolio price index (100 = each listing's price 30 days ago), reference
  * brand vs competitor median. One axis, two series, direct end labels.
  */
-export function IndexTrendChart({ data, height = 220, referenceLabel = "Your brand" }: { data: IndexPoint[]; height?: number; referenceLabel?: string }) {
+export function IndexTrendChart({ data, height = 220, referenceLabel = "Your brand", since = "30 days ago", emptyText = "Not enough history yet — the index appears after a few days of monitoring." }: { data: IndexPoint[]; height?: number; referenceLabel?: string; since?: string; emptyText?: string }) {
   const vals = data.flatMap((d) => [d.reference, d.competitors]).filter((v): v is number => v !== null);
   if (vals.length < 2) {
-    return <div className="flex items-center justify-center text-sm text-ink-3" style={{ height }}>Not enough history yet — the index appears after a few days of monitoring.</div>;
+    return <div className="flex items-center justify-center px-4 text-center text-sm text-ink-3" style={{ height }}>{emptyText}</div>;
   }
   const lo = Math.floor(Math.min(...vals, 100) - 1);
   const hi = Math.ceil(Math.max(...vals, 100) + 1);
   const last = data.at(-1);
   return (
-    <div style={{ height }} className="chart-reveal relative [overflow-x:clip]" role="img" aria-label={`Price index over 30 days. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = 30 days ago).`}>
+    <div style={{ height }} className="chart-reveal relative [overflow-x:clip]" role="img" aria-label={`Price index. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = ${since}).`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: Math.min(132, Math.max(80, 14 + Math.min(referenceLabel.length, 18) * 6.6)), bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
@@ -55,7 +55,7 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
                     { key: "r", color: "var(--series-1)", label: referenceLabel, value: payload.find((p) => p.dataKey === "reference")?.value != null ? Number(payload.find((p) => p.dataKey === "reference")!.value).toFixed(1) : "—" },
                     { key: "c", color: "var(--series-2)", label: "Competitor median", value: payload.find((p) => p.dataKey === "competitors")?.value != null ? Number(payload.find((p) => p.dataKey === "competitors")!.value).toFixed(1) : "—" },
                   ]}
-                  footer="Index: 100 = each listing's own price 30 days ago"
+                  footer={`Index: 100 = each listing's own price ${since}`}
                 />
               ) : null
             }

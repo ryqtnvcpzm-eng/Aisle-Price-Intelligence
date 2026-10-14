@@ -105,6 +105,8 @@ export interface ProtectionStatus {
   groups: { id: string; name: string }[];
   rules: { type: ProtectionType; active: number; paused: number; fired: number; lastTriggeredAt: string | null }[];
   events: { id: string; ruleId: string; type: ProtectionType; groupName: string | null; headline: string; detail: string | null; firedAt: string; isSimulated: boolean; deliveredChannels: string[] }[];
+  /** Protection alerts fired in the last 7 days. */
+  fired7d: number;
 }
 
 export async function protectionStatus(workspaceId: string): Promise<ProtectionStatus> {
@@ -120,6 +122,9 @@ export async function protectionStatus(workspaceId: string): Promise<ProtectionS
     ? await db.select({ ruleId: alertEvents.ruleId, n: sql<number>`count(*)::int` }).from(alertEvents).where(and(inArray(alertEvents.ruleId, ruleIds), eq(alertEvents.isTest, false))).groupBy(alertEvents.ruleId)
     : [];
   const fired = new Map(counts.map((c) => [c.ruleId, c.n]));
+  const [{ n: fired7d } = { n: 0 }] = ruleIds.length
+    ? await db.select({ n: sql<number>`count(*)::int` }).from(alertEvents).where(and(inArray(alertEvents.ruleId, ruleIds), eq(alertEvents.isTest, false), sql`${alertEvents.firedAt} >= now() - interval '7 days'`))
+    : [];
   const events = ruleIds.length ? await db.select().from(alertEvents).where(and(inArray(alertEvents.ruleId, ruleIds), eq(alertEvents.isTest, false))).orderBy(desc(alertEvents.firedAt)).limit(20) : [];
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
   const ruleById = new Map(rules.map((r) => [r.id, r]));
@@ -128,6 +133,7 @@ export async function protectionStatus(workspaceId: string): Promise<ProtectionS
     enabled: Boolean(ws?.settings.brandProtection),
     brand: ref ? { id: ref.id, name: ref.name } : null,
     groups,
+    fired7d,
     rules: PROTECTION_TYPES.map((type) => {
       const rs = rules.filter((r) => r.type === type);
       return { type, active: rs.filter((r) => !r.paused).length, paused: rs.filter((r) => r.paused).length, fired: rs.reduce((s, r) => s + (fired.get(r.id) ?? 0), 0), lastTriggeredAt: latest(rs) };

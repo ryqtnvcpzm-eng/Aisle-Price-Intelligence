@@ -13,6 +13,7 @@
  * Quantities: integer milli-base units (`bigint` mg / µl / milli-count).
  */
 import { sql } from "drizzle-orm";
+import type { BriefingContent } from "@/lib/briefing-types";
 import {
   bigint,
   bigserial,
@@ -698,7 +699,7 @@ export const briefings = pgTable(
     periodEnd: ts("period_end").notNull(),
     referenceBrandId: uuid("reference_brand_id").references(() => brands.id, { onDelete: "set null" }),
     referenceBrandName: text("reference_brand_name"),
-    content: jsonb("content").$type<Record<string, unknown>>().notNull(),
+    content: jsonb("content").$type<BriefingContent>().notNull(),
     containsSimulated: boolean("contains_simulated").notNull().default(false),
     version: integer("version").notNull().default(1),
     generatedBy: text("generated_by"),

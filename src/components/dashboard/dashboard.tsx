@@ -7,11 +7,13 @@ import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/freshness";
 import { formatMoney, formatPct } from "@/lib/money";
+import { weekLabel } from "@/lib/week";
 import type { VariantRow } from "@/server/catalog/queries";
 import type { Insight } from "@/server/insights/engine";
 import { IndexTrendChart, type IndexPoint } from "../charts/index-trend-chart";
 import { spring, staggerDelay } from "../motion/tokens";
 import { useImport } from "../import/import-context";
+import { ProtectMyBrandButton } from "../alerts/brand-protection";
 import { AnimatedNumber } from "../ui/animated-number";
 import { Badge } from "../ui/badge";
 import { Button, ButtonLink } from "../ui/button";
@@ -62,7 +64,13 @@ function greeting(tz: string) {
 
 const appear = (i: number) => ({ initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { ...spring.gentle, delay: staggerDelay(i, 0.06) } });
 
-export function Dashboard({ data, insights, userName, renderedAt }: { data: DashboardData; insights: Insight[]; userName: string; renderedAt: string }) {
+export interface OverviewExtras {
+  briefing: { weekStart: string; weekEnd: string; sentences: string[]; containsSimulated: boolean } | null;
+  brand: { id: string; name: string } | null;
+  protection: { enabled: boolean; comparisons: number; alerts7d: number };
+}
+
+export function Dashboard({ data, insights, userName, renderedAt, extras }: { data: DashboardData; insights: Insight[]; userName: string; renderedAt: string; extras: OverviewExtras }) {
   const app = useApp();
   const importer = useImport();
   const k = data.kpis;
@@ -126,6 +134,38 @@ export function Dashboard({ data, insights, userName, renderedAt }: { data: Dash
         <Kpi href="/alerts" label="Alerts · 24h" value={k.alerts24h} sub={`${k.activeRules} active rules`} icon={Bell} />
         <Kpi href="/settings#monitoring" label="Fresh data" value={k.coverage === null ? null : Math.round(k.coverage * 100)} suffix="%" icon={Clock} bar={k.coverage} />
       </motion.section>
+
+      {/* Monday Briefing + My Brand */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
+        <motion.section {...appear(2)} className="card flex flex-col p-5">
+          <SectionHeader
+            eyebrow="Monday Briefing"
+            title={extras.briefing ? `Week of ${weekLabel(extras.briefing)}` : "Your week in one read"}
+            action={<ButtonLink href={extras.briefing ? `/briefing/${extras.briefing.weekStart}` : "/briefing"} variant="ghost" size="sm">{extras.briefing ? "Read" : "Open"} <ArrowRight className="size-3.5" /></ButtonLink>}
+          />
+          {extras.briefing ? (
+            <div className="mt-3 space-y-1 text-sm leading-relaxed text-ink-2">
+              {extras.briefing.sentences.slice(0, 3).map((t, i) => <p key={i} className={i === 0 ? "text-ink" : undefined}>{t}</p>)}
+              {extras.briefing.containsSimulated && <div className="pt-1"><SimulatedBadge /></div>}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-ink-3">Every Monday Aisle writes up the previous week — your position, the biggest moves, undercuts and sharp drops.</p>
+          )}
+        </motion.section>
+        <motion.section {...appear(2)} className="card flex flex-col p-5">
+          <SectionHeader eyebrow="My brand" title={extras.brand?.name ?? "Not chosen yet"} action={<ButtonLink href="/brands" variant="ghost" size="sm">Brands <ArrowRight className="size-3.5" /></ButtonLink>} />
+          <p className="mt-2 flex-1 text-sm text-ink-2">
+            {!extras.brand
+              ? "Tell Aisle which brand is yours to compare it with the market and get alerted when it's undercut."
+              : extras.protection.enabled
+                ? `Protected in ${extras.protection.comparisons} comparison${extras.protection.comparisons === 1 ? "" : "s"} · ${extras.protection.alerts7d} alert${extras.protection.alerts7d === 1 ? "" : "s"} in the last 7 days.`
+                : `Compared with the market in ${extras.protection.comparisons} comparison${extras.protection.comparisons === 1 ? "" : "s"}. Turn on alerts for undercuts, leadership changes, stock-outs and rival drops.`}
+          </p>
+          <div className="mt-4">
+            <ProtectMyBrandButton brand={extras.brand} enabled={extras.protection.enabled} size="sm" />
+          </div>
+        </motion.section>
+      </div>
 
       {/* Trend + what changed */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
