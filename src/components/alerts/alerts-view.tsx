@@ -310,7 +310,7 @@ function RuleDialog({ open, onOpenChange, rule, prefill, variants, groups, email
           <label className="flex items-center justify-between gap-3 text-sm">
             <span>
               Also email me
-              {!emailConfigured && <span className="block text-2xs text-ink-3">Email isn't set up — in-app only for now. See Settings → Notifications.</span>}
+              {!emailConfigured && <span className="block text-2xs text-ink-3">Email isn&apos;t set up — in-app only for now. See Settings → Notifications.</span>}
             </span>
             <Switch checked={email} onCheckedChange={setEmail} label="Email notifications" disabled={!emailConfigured} />
           </label>
