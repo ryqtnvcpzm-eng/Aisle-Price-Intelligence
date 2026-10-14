@@ -50,7 +50,13 @@ test("add a competitor and create the comparison", async () => {
   await expect(page.getByRole("heading", { name: /Tracking \d+ variants/ })).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("Comparison name").fill("Plant Protein — India");
+  // Onboarding asks which brand is yours, defaulting to the first product's brand.
+  await expect(page.getByRole("heading", { name: "Which brand is yours?" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Lumen Nutrition/ })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: /This is my brand/ }).click();
+  await expect(page.getByRole("heading", { name: "Your comparisons are ready" })).toBeVisible();
+  await expect(page.getByText(/Lumen Nutrition vs Market · Plant Protein/)).toBeVisible();
+  await page.getByLabel("Name another comparison (optional)").fill("Plant Protein — India");
   await page.getByRole("button", { name: /Open my dashboard/ }).click();
   await expect(page).toHaveURL(/\/comparisons\//);
   await expect(page.getByRole("heading", { name: "Plant Protein — India" })).toBeVisible();
@@ -115,7 +121,7 @@ test("export a comparison report", async () => {
 });
 
 test("key screens have no serious accessibility violations", async () => {
-  for (const path of ["/", "/products", "/comparisons", "/alerts", "/settings"]) {
+  for (const path of ["/", "/products", "/comparisons", "/brands", "/briefing", "/alerts", "/imports", "/settings"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     const results = await new AxeBuilder({ page }).disableRules(["color-contrast"]).analyze();

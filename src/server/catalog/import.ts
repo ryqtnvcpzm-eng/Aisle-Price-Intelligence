@@ -22,6 +22,7 @@ import {
 import { getActiveProvider, getProvider, ProviderError, type PriceSnapshot, type ProviderId, type ProviderProduct, type VariationFamily } from "../providers";
 import { HttpError } from "../errors";
 import type { AppContext } from "../workspace/context";
+import { reconcileAfterChange } from "../brand/hooks";
 import { quantitiesFor, variantLabel } from "./normalize";
 import { rescheduleListings, upsertListing, writeObservation } from "./persist";
 
@@ -99,7 +100,13 @@ function reviveSnapshot<T extends { observedAt: string | Date }>(s: T): Omit<T, 
   return { ...s, observedAt: new Date(s.observedAt) };
 }
 
-export async function previewImport(ctx: AppContext, rawInput: string, marketplaceOverride: MarketplaceCode | null): Promise<ImportPreview> {
+/**
+ * `discoverVariants: false` (bulk imports that keep only the pasted listing)
+ * skips the extra variation and sibling lookups, so a large import costs one
+ * provider lookup per link instead of up to one per size and flavour.
+ */
+export async function previewImport(ctx: AppContext, rawInput: string, marketplaceOverride: MarketplaceCode | null, opts: { discoverVariants?: boolean } = {}): Promise<ImportPreview> {
+  const discover = opts.discoverVariants ?? true;
   const defaultMp = marketplaceOverride ?? (isMarketplaceCode(ctx.workspace.defaultMarketplace) ? ctx.workspace.defaultMarketplace : "IN");
   const parsed = parseManyInputs(rawInput, defaultMp).slice(0, MAX_INPUTS);
   const errors: PreviewError[] = [];
@@ -159,7 +166,7 @@ export async function previewImport(ctx: AppContext, rawInput: string, marketpla
         continue;
       }
       let family = batch.variations.get(target.asin);
-      if (!family || family.completeness === "unavailable") {
+      if (discover && (!family || family.completeness === "unavailable")) {
         try {
           if (provider.capabilities.variations) family = await provider.getVariations(marketplace, target.asin);
         } catch {
@@ -170,7 +177,7 @@ export async function previewImport(ctx: AppContext, rawInput: string, marketpla
 
       // Fetch details for siblings we don't have yet (capped to protect provider budget).
       const childAsins = family.children.map((c) => c.asin).slice(0, MAX_CHILDREN);
-      const missing = childAsins.filter((a) => !productsByAsin.has(a));
+      const missing = discover ? childAsins.filter((a) => !productsByAsin.has(a)) : [];
       if (missing.length) {
         try {
           const more = await provider.getProducts(marketplace, missing, { history: provider.capabilities.priceHistory && provider.capabilities.monitoring, historyDays: 90 });
@@ -322,7 +329,7 @@ function slugify(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "item";
 }
 
-export async function commitImport(ctx: AppContext, input: CommitInput) {
+export async function commitImport(ctx: AppContext, input: CommitInput, opts: { skipReconcile?: boolean } = {}) {
   const cached = await cacheGet<CachedPreview>(`import:${input.previewId}`);
   if (!cached || cached.workspaceId !== ctx.workspace.id) {
     throw new HttpError(410, "This preview expired. Paste the link again to refresh it.", "preview_expired");
@@ -481,5 +488,6 @@ export async function commitImport(ctx: AppContext, input: CommitInput) {
     );
     return { familyIds, variantIds, groupId, brandIds: [...new Set(brandIds)] };
   });
+  if (!opts.skipReconcile) await reconcileAfterChange({ workspaceId: ctx.workspace.id, userId: ctx.user.id });
   return result;
 }

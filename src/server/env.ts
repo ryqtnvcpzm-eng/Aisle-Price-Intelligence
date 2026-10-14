@@ -30,6 +30,8 @@ const schema = z.object({
 
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default("Aisle <alerts@example.com>"),
+  /** "true" records every email as skipped instead of sending it (tests, previews, staging). */
+  EMAIL_DRY_RUN: z.enum(["true", "false"]).default("false"),
   /** Optional, opt-in. The feature is hidden and nothing is called unless a key is set. */
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default("claude-opus-5-5"),

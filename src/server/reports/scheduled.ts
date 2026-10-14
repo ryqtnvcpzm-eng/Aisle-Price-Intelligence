@@ -1,8 +1,10 @@
 import "server-only";
-import { and, eq, ne } from "drizzle-orm";
-import { sendEmail } from "../alerts/deliver";
+import { eq, ne } from "drizzle-orm";
 import { db } from "../db/client";
-import { reportDefinitions, reportRuns, user, workspaceMembers } from "../db/schema";
+import { reportDefinitions, reportRuns } from "../db/schema";
+import { env } from "../env";
+import { sendEmailNow, workspaceRecipients } from "../notifications/email";
+import { reportReadyEmail } from "../notifications/templates";
 import { logger } from "../logger";
 import { buildReport, reportParamsSchema } from "./build";
 
@@ -20,11 +22,13 @@ export async function runScheduledReports(now = new Date()) {
       const params = reportParamsSchema.parse({ ...d.params, type: d.type, format: d.format });
       const data = await buildReport(d.workspaceId, params);
       const rows = data.sections.reduce((s, x) => s + x.rows.length, 0);
-      await db.insert(reportRuns).values({ workspaceId: d.workspaceId, definitionId: d.id, type: d.type, params: d.params, format: d.format, rowCount: rows, dataAsOf: data.dataAsOf ? new Date(data.dataAsOf) : null, containsSimulated: data.containsSimulated });
+      const [run] = await db.insert(reportRuns).values({ workspaceId: d.workspaceId, definitionId: d.id, type: d.type, params: d.params, format: d.format, rowCount: rows, dataAsOf: data.dataAsOf ? new Date(data.dataAsOf) : null, containsSimulated: data.containsSimulated }).returning({ id: reportRuns.id });
       await db.update(reportDefinitions).set({ lastRunAt: now }).where(eq(reportDefinitions.id, d.id));
       if (!data.containsSimulated) {
-        const to = await db.select({ email: user.email }).from(workspaceMembers).innerJoin(user, eq(user.id, workspaceMembers.userId)).where(and(eq(workspaceMembers.workspaceId, d.workspaceId)));
-        await sendEmail(to.map((t) => t.email), `Aisle report ready: ${d.name}`, `${data.title}\n${data.subtitle}\nOpen Aisle → Reports to download.`);
+        const email = reportReadyEmail({ name: d.name, title: data.title, subtitle: data.subtitle, url: `${env.BETTER_AUTH_URL}/reports` });
+        for (const r of await workspaceRecipients(d.workspaceId)) {
+          await sendEmailNow({ workspaceId: d.workspaceId, userId: r.userId, recipient: r.email, kind: "report", email, idempotencyKey: `report:${run!.id}:${r.userId}` });
+        }
       }
       ran++;
     } catch (e) {

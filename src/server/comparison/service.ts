@@ -89,8 +89,11 @@ export async function createGroup(ctx: AppContext, input: z.infer<typeof groupSc
   });
 }
 
+const MANAGED_COPY = "Aisle keeps this comparison in sync with your brand and catalog. Change your brand on the Brands page instead.";
+
 export async function updateGroup(ctx: AppContext, groupId: string, input: Partial<z.infer<typeof groupSchema>>) {
-  await getGroup(ctx.workspace.id, groupId);
+  const existing = await getGroup(ctx.workspace.id, groupId);
+  if (existing.managedBy && (input.name !== undefined || input.basis !== undefined || input.referenceBrandId !== undefined)) throw new HttpError(409, MANAGED_COPY, "managed_group");
   if (input.referenceBrandId) {
     const [b] = await db.select().from(brands).where(and(eq(brands.id, input.referenceBrandId), eq(brands.workspaceId, ctx.workspace.id)));
     if (!b) throw new HttpError(404, "Brand not found.");
@@ -108,6 +111,7 @@ export async function updateGroup(ctx: AppContext, groupId: string, input: Parti
 
 export async function archiveGroup(ctx: AppContext, groupId: string, archived: boolean) {
   const g = await getGroup(ctx.workspace.id, groupId);
+  if (g.managedBy) throw new HttpError(409, MANAGED_COPY, "managed_group");
   await db.update(comparisonGroups).set({ archivedAt: archived ? new Date() : null }).where(eq(comparisonGroups.id, groupId));
   await logActivity({ workspaceId: ctx.workspace.id, actorUserId: ctx.user.id, kind: archived ? "group_archived" : "group_restored", message: `${archived ? "Archived" : "Restored"} comparison “${g.name}”`, entityType: "group", entityId: groupId });
 }
@@ -138,7 +142,12 @@ export async function updateItem(ctx: AppContext, groupId: string, itemId: strin
 }
 
 export async function removeItems(ctx: AppContext, groupId: string, variantIds: string[]) {
-  await getGroup(ctx.workspace.id, groupId);
+  const g = await getGroup(ctx.workspace.id, groupId);
+  // Membership of a managed comparison follows the catalog; leaving a listing out means excluding it from calculations.
+  if (g.managedBy) {
+    await db.update(comparisonItems).set({ status: "suggested" }).where(and(eq(comparisonItems.groupId, groupId), inArray(comparisonItems.variantId, variantIds)));
+    return;
+  }
   await db.delete(comparisonItems).where(and(eq(comparisonItems.groupId, groupId), inArray(comparisonItems.variantId, variantIds)));
 }
 

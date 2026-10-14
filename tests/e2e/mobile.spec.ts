@@ -19,7 +19,7 @@ test("mobile tab bar, More sheet, and no horizontal overflow", async ({ page }) 
   await expect(page).toHaveURL(/\/insights/);
 
   // Same session (sign-ins are rate-limited): no screen may be wider than the phone.
-  for (const path of ["/products", "/comparisons", "/history", "/brands", "/insights", "/alerts", "/reports", "/activity", "/settings"]) {
+  for (const path of ["/products", "/comparisons", "/history", "/brands", "/briefing", "/insights", "/alerts", "/imports", "/reports", "/activity", "/settings"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     await expectNoHorizontalOverflow(page);

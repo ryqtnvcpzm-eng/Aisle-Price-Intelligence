@@ -16,6 +16,9 @@ import { sqlClient } from "../src/server/db/client";
 import { env } from "../src/server/env";
 import { logger } from "../src/server/logger";
 import { runMaintenance } from "../src/server/monitoring/maintenance";
+import { processDueDeliveries } from "../src/server/notifications/email";
+import { generateDueBriefings } from "../src/server/briefing/service";
+import { processImportJobs } from "../src/server/catalog/bulk-import";
 import { writeHeartbeat } from "../src/server/monitoring/heartbeat";
 import { getQueue, QUEUE_NAME, type RefreshJobData } from "../src/server/monitoring/queue";
 import { runRefreshJob } from "../src/server/monitoring/refresh";
@@ -49,6 +52,12 @@ async function processJob(job: Job) {
     }
     case "scheduled-reports":
       return runScheduledReports();
+    case "deliveries":
+      return processDueDeliveries();
+    case "briefings":
+      return generateDueBriefings();
+    case "import-jobs":
+      return processImportJobs();
     default:
       throw new UnrecoverableError(`Unknown job ${job.name}`);
   }
@@ -65,6 +74,10 @@ async function main() {
   await queue.upsertJobScheduler("system-alerts-hourly", { pattern: "7 * * * *" }, { name: "digest", opts: { attempts: 2 } });
   await queue.upsertJobScheduler("maintenance-daily", { pattern: "30 3 * * *" }, { name: "maintenance", opts: { attempts: 2 } });
   await queue.upsertJobScheduler("reports-daily", { pattern: "0 6 * * *" }, { name: "scheduled-reports", opts: { attempts: 2 } });
+  // Idempotent: builds last week's briefing once per workspace (each in its own time zone), then no-ops.
+  await queue.upsertJobScheduler("briefings-hourly", { pattern: "17 * * * *" }, { name: "briefings", opts: { attempts: 2 } });
+  await queue.upsertJobScheduler("import-jobs-every-1m", { every: 60_000 }, { name: "import-jobs", opts: { attempts: 1 } });
+  await queue.upsertJobScheduler("deliveries-every-2m", { every: 2 * 60_000 }, { name: "deliveries", opts: { attempts: 1 } });
 
   const worker = new Worker(QUEUE_NAME, processJob, {
     connection: bullConnection(),

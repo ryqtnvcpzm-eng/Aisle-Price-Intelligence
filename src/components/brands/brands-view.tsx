@@ -1,12 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowRight, Info } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
-import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatMoney, formatPct, pctChange } from "@/lib/money";
 import { brandColorMap, OTHER_VAR } from "@/lib/series-colors";
@@ -42,8 +39,7 @@ interface BrandData {
   changes: { variantId: string; familyId: string; label: string; title: string; from: number; to: number; currency: string }[];
 }
 
-export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]; brands: { id: string; name: string; isReference: boolean }[]; initialBrand: string | null }) {
-  const router = useRouter();
+export function BrandsView({ stats, initialBrand }: { stats: BrandData[]; initialBrand: string | null }) {
   const [active, setActive] = useState<string | null>(initialBrand ?? stats[0]?.name ?? null);
   const ref = stats.find((s) => s.isReference);
   const [vs, setVs] = useState<string>(stats.find((s) => !s.isReference)?.name ?? "");
@@ -51,25 +47,12 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
   const brand = stats.find((s) => s.name === active) ?? null;
   const other = stats.find((s) => s.name === vs) ?? null;
 
-  if (!stats.length) return <EmptyState icon={<Tag />} title="No brands yet" description="Brands appear as you add products. Mark one as your reference to see how competitors price against it." />;
-
-  async function setReference(id: string | null) {
-    await api("/api/brands/reference", { method: "POST", body: { brandId: id } });
-    toast.success("Reference brand updated");
-    router.refresh();
-  }
+  if (!stats.length) return <EmptyState icon={<Tag />} title="No brands yet" description="Brands appear as you add products. Choose yours above to see how competitors price against it." />;
 
   const maxAbs = Math.max(0.05, ...stats.map((s) => Math.abs(s.medianPremium ?? 0)));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3 rounded-[14px] bg-surface-2 px-4 py-3 text-sm shadow-[var(--ring-inset)]">
-        <Info className="size-4 text-ink-3" />
-        <span className="text-ink-2">Reference brand</span>
-        <Select ariaLabel="Reference brand" size="sm" value={brands.find((b) => b.isReference)?.id ?? "none"} onValueChange={(v) => setReference(v === "none" ? null : v)} options={[{ value: "none", label: "None" }, ...brands.map((b) => ({ value: b.id, label: b.name }))]} />
-        <span className="text-xs text-ink-3">Competitive premiums and “undercut” alerts are measured against this brand.</span>
-      </div>
-
       {/* Premium chart — diverging, neutral midpoint */}
       <section className="card p-5">
         <SectionHeader title="Price position" description="Median unit-price premium vs. other brands in the same comparison groups" />
@@ -111,7 +94,7 @@ export function BrandsView({ stats, brands, initialBrand }: { stats: BrandData[]
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-semibold tracking-tight">{brand.name}</h2>
-                  {brand.isReference && <Badge tone="accent" size="xs">Reference</Badge>}
+                  {brand.isReference && <Badge tone="accent" size="xs">Your brand</Badge>}
                   {brand.segment && <Badge tone="neutral" size="xs">{brand.segment.label}</Badge>}
                 </div>
                 <p className="mt-0.5 text-xs text-ink-3">{brand.categories.join(" · ") || "No category"} · {brand.marketplaces.map((m) => m).join(", ")}</p>

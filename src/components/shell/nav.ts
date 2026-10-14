@@ -1,7 +1,8 @@
-import { Activity, BarChart3, Bell, FileText, Home, LineChart, Package, Settings, Sparkles, Tag } from "lucide-react";
+import { Activity, BarChart3, Bell, FileText, Home, LineChart, Newspaper, Package, Settings, Sparkles, Tag } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Overview", icon: Home, key: "g o" },
+  { href: "/briefing", label: "Monday Briefing", icon: Newspaper, key: "g w" },
   { href: "/products", label: "Products", icon: Package, key: "g p" },
   { href: "/comparisons", label: "Comparisons", icon: BarChart3, key: "g c" },
   { href: "/brands", label: "Brands", icon: Tag, key: "g b" },

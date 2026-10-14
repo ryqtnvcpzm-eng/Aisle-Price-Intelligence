@@ -3,21 +3,25 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowLeft, ArrowRight, BarChart3, Bell, Check, Layers, Link2, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { MARKETPLACES, PRIMARY_MARKETPLACES, type MarketplaceCode } from "@/lib/marketplaces";
+import type { ReconcileResult } from "@/server/brand/reference";
+import { BrandChoiceList, choiceBody, type BrandChoice, type BrandOption } from "../brand/brand-choice";
 import { duration, spring, staggerDelay } from "../motion/tokens";
 import { ImportProvider, useImport, type ImportResult } from "../import/import-context";
 import { AppInfoProvider, type AppInfo } from "../shell/app-context";
 import { Logo } from "../shell/logo";
 import { PreferencesProvider } from "../shell/preferences";
 import { Button } from "../ui/button";
+import { Skeleton } from "../ui/empty-state";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
 
-const STEPS = ["welcome", "marketplace", "products", "compare"] as const;
+const STEPS = ["welcome", "marketplace", "products", "brand", "compare"] as const;
 type Step = (typeof STEPS)[number];
 
 export function Onboarding({ info }: { info: AppInfo }) {
@@ -42,7 +46,14 @@ function Flow({ info }: { info: AppInfo }) {
   const [groupName, setGroupName] = useState("");
   const [hourly, setHourly] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [brandChoice, setBrandChoice] = useState<BrandChoice>(null);
+  const [newBrand, setNewBrand] = useState("");
+  const [managed, setManaged] = useState<{ id: string; name: string }[]>([]);
   const idx = STEPS.indexOf(step);
+  const { data: brandList } = useQuery({ queryKey: ["brands", imports.length], queryFn: () => api<{ brands: BrandOption[] }>("/api/brands"), enabled: step === "brand" });
+  // Default to the brand of the first product added — the usual "this one is mine" — but always ask.
+  const firstBrand = brandList?.brands.find((b) => b.id === imports[0]?.brandIds?.[0]) ?? null;
+  const effectiveChoice: BrandChoice = brandChoice ?? (firstBrand ? { kind: "existing", id: firstBrand.id, name: firstBrand.name } : null);
   const variantIds = imports.flatMap((r) => r.variantIds);
 
   const go = (s: Step) => {
@@ -59,12 +70,28 @@ function Flow({ info }: { info: AppInfo }) {
         const r = await api<{ group: { id: string } }>("/api/groups", { method: "POST", body: { name: groupName.trim(), variantIds } });
         groupId = r.group.id;
       }
+      groupId ??= skip ? null : (managed[0]?.id ?? null);
       if (!skip && !hourly && variantIds.length) await api("/api/variants", { method: "PATCH", body: { ids: variantIds, patch: { intervalMinutes: 1440 } } });
       router.push(groupId ? `/comparisons/${groupId}` : "/");
       router.refresh();
     } catch (e) {
       setBusy(false);
       toast.error(e instanceof Error ? e.message : "Couldn't finish setup.");
+    }
+  }
+
+  async function saveBrand() {
+    const body = choiceBody(effectiveChoice);
+    if (!body) return go("compare");
+    setBusy(true);
+    try {
+      const r = await api<{ reconcile: ReconcileResult }>("/api/brands/reference", { method: "POST", body });
+      setManaged(r.reconcile.cohorts.filter((c) => c.groupId).map((c) => ({ id: c.groupId!, name: c.name })));
+      go("compare");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't save your brand.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -185,11 +212,7 @@ function Flow({ info }: { info: AppInfo }) {
                     whileTap={{ scale: 0.985 }}
                     onClick={() =>
                       importer.open(undefined, {
-                        onDone: (r) => {
-                          // The first product added during onboarding is the user's own: make its brand the reference.
-                          if (!imports.length && r.brandIds?.[0]) void api("/api/brands/reference", { method: "POST", body: { brandId: r.brandIds[0] } });
-                          setImports((x) => [...x, r]);
-                        },
+                        onDone: (r) => setImports((x) => [...x, r]),
                       })
                     }
                     className="flex w-full items-center gap-3 rounded-[16px] border border-dashed border-[var(--line-strong)] bg-surface-2 p-5 text-left transition-colors hover:border-accent hover:bg-accent-softer"
@@ -203,19 +226,51 @@ function Flow({ info }: { info: AppInfo }) {
                     </span>
                   </motion.button>
                 </div>
-                <Nav onBack={() => go("marketplace")} onNext={() => go("compare")} nextLabel={imports.length ? "Continue" : "I'll add products later"} />
+                <Nav onBack={() => go("marketplace")} onNext={() => go("brand")} nextLabel={imports.length ? "Continue" : "I'll add products later"} />
+              </div>
+            )}
+
+            {step === "brand" && (
+              <div>
+                <h2 className="text-3xl font-semibold tracking-tight">Which brand is yours?</h2>
+                <p className="mt-2 text-md text-ink-2">Aisle measures every competitor against it and keeps a “vs Market” comparison for each category you sell in. You can change it later in Brands.</p>
+                <div className="mt-8">
+                  {brandList ? (
+                    <BrandChoiceList brands={brandList.brands} value={effectiveChoice} onChange={setBrandChoice} newName={newBrand} onNewName={setNewBrand} />
+                  ) : (
+                    <div className="space-y-1.5">{[0, 1].map((i) => <Skeleton key={i} className="h-[58px] rounded-[12px]" />)}</div>
+                  )}
+                </div>
+                <div className="mt-10 flex items-center justify-between">
+                  <Button variant="ghost" onClick={() => go("products")}>
+                    <ArrowLeft className="size-4" /> Back
+                  </Button>
+                  <Button variant="primary" size="lg" loading={busy} onClick={saveBrand}>
+                    {choiceBody(effectiveChoice) ? <>This is my brand <ArrowRight className="size-4" /></> : <>Skip for now <ArrowRight className="size-4" /></>}
+                  </Button>
+                </div>
               </div>
             )}
 
             {step === "compare" && (
               <div>
-                <h2 className="text-3xl font-semibold tracking-tight">{variantIds.length >= 2 ? "Name your first comparison" : "Almost there"}</h2>
-                <p className="mt-2 text-md text-ink-2">{variantIds.length >= 2 ? `Group the ${variantIds.length} variants you added so Aisle can rank them on a unit-price basis.` : "Comparisons need at least two listings — you can create one any time from Products."}</p>
+                <h2 className="text-3xl font-semibold tracking-tight">{managed.length ? "Your comparisons are ready" : variantIds.length >= 2 ? "Name your first comparison" : "Almost there"}</h2>
+                <p className="mt-2 text-md text-ink-2">{managed.length ? "Aisle grouped your products with competitors that share a category and unit, so prices compare fairly." : variantIds.length >= 2 ? `Group the ${variantIds.length} variants you added so Aisle can rank them on a unit-price basis.` : "Comparisons need at least two listings — you can create one any time from Products."}</p>
                 <div className="mt-8 space-y-3">
+                  {managed.length > 0 && (
+                    <ul className="card divide-y divide-[var(--hairline)]">
+                      {managed.map((g) => (
+                        <li key={g.id} className="flex items-center gap-3 px-4 py-3 text-sm">
+                          <Check className="size-4 text-good" strokeWidth={2.6} />
+                          <span className="min-w-0 flex-1 truncate font-medium">{g.name}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   {variantIds.length >= 2 && (
                     <div className="card p-4">
-                      <label htmlFor="g-name" className="text-sm font-medium">Comparison name</label>
-                      <Input id="g-name" autoFocus className="mt-2" placeholder="e.g. Plant Protein — India" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+                      <label htmlFor="g-name" className="text-sm font-medium">{managed.length ? "Name another comparison (optional)" : "Comparison name"}</label>
+                      <Input id="g-name" autoFocus={!managed.length} className="mt-2" placeholder="e.g. Plant Protein — India" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
                     </div>
                   )}
                   <div className="card flex items-center gap-4 p-4">
@@ -228,10 +283,10 @@ function Flow({ info }: { info: AppInfo }) {
                   </div>
                 </div>
                 <div className="mt-10 flex items-center justify-between">
-                  <Button variant="ghost" onClick={() => go("products")}>
+                  <Button variant="ghost" onClick={() => go("brand")}>
                     <ArrowLeft className="size-4" /> Back
                   </Button>
-                  <Button variant="primary" size="lg" loading={busy} disabled={variantIds.length >= 2 && !groupName.trim()} onClick={() => finish()}>
+                  <Button variant="primary" size="lg" loading={busy} disabled={variantIds.length >= 2 && !groupName.trim() && !managed.length} onClick={() => finish()}>
                     <Sparkles className="size-4" /> Open my dashboard
                   </Button>
                 </div>

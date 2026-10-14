@@ -15,6 +15,8 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq, gt, inArray, sql } from "drizzle-orm";
 import { detectEvents } from "../src/lib/analytics";
 import { formatMoney, formatPct } from "../src/lib/money";
+import { reconcileReferenceMarket } from "../src/server/brand/reference";
+import { ensureBriefing } from "../src/server/briefing/service";
 import { quantitiesFor, variantLabel } from "../src/server/catalog/normalize";
 import { db, sqlClient } from "../src/server/db/client";
 import * as s from "../src/server/db/schema";
@@ -278,7 +280,13 @@ async function main() {
   await db.update(s.variants).set({ intervalMinutes: null }).where(eq(s.variants.id, paused.variantId));
   await db.update(s.listings).set({ checkIntervalMinutes: null, nextCheckAt: null }).where(inArray(s.listings.id, [paused.listingId]));
 
+  // The demo's own brand comes from the fictional catalog (data, not code); build its "vs Market" comparisons.
+  const managed = await reconcileReferenceMarket({ workspaceId: ws!.id, userId });
+  // Last week's Monday Briefing, from the simulated observations above.
+  await ensureBriefing(ws!.id, { actorUserId: userId });
+
   console.log(`✓ seeded demo workspace in ${Date.now() - started}ms — ${variantByAsin.size} variants (${variantByAsin.size - 1} monitored hourly, 1 paused on purpose to show the paused state), ${obsCount} simulated observations`);
+  console.log(`  ${managed.cohorts.length} managed “${DEMO_REFERENCE_BRAND} vs Market” comparisons, ${managed.unmatched.length} listings not yet matched`);
   console.log(`  sign in: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
 }
 

@@ -19,7 +19,7 @@ export function Select({ value, onValueChange, options, placeholder, className, 
         id={id}
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex items-center justify-between gap-2 rounded-[9px] bg-surface text-left text-ink shadow-[var(--shadow-xs),inset_0_0_0_0.5px_var(--line-strong)] outline-none transition-colors hover:bg-surface-2 focus-visible:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_4px_var(--accent-soft)] data-[placeholder]:text-ink-3",
+          "inline-flex max-w-full min-w-0 items-center justify-between gap-2 rounded-[9px] bg-surface text-left text-ink shadow-[var(--shadow-xs),inset_0_0_0_0.5px_var(--line-strong)] outline-none transition-colors hover:bg-surface-2 focus-visible:shadow-[inset_0_0_0_1px_var(--accent),0_0_0_4px_var(--accent-soft)] data-[placeholder]:text-ink-3",
           size === "sm" ? "h-7 px-2.5 text-sm" : "h-8 px-3 text-sm",
           className,
         )}

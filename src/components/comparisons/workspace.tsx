@@ -34,7 +34,7 @@ import { Tooltip } from "../ui/tooltip";
 import { ComparisonVisual } from "./comparison-visual";
 
 interface Detail {
-  group: { id: string; name: string; description: string | null; basis: string; referenceBrandId: string | null; marketplace: string | null; updatedAt: string };
+  group: { id: string; name: string; description: string | null; basis: string; referenceBrandId: string | null; marketplace: string | null; managedBy: string | null; updatedAt: string };
   items: GroupItemRow[];
   result: ComparisonResult;
   referenceBrand: { id: string; name: string } | null;
@@ -80,9 +80,14 @@ export function ComparisonWorkspace({ detail, brands }: { detail: Detail; brands
     await api(`/api/groups/${group.id}/items/${itemId}`, { method: "PATCH", body });
     router.refresh();
   }
+  const managed = Boolean(group.managedBy);
   async function removeItems(variantIds: string[]) {
     await api(`/api/groups/${group.id}/items`, { method: "DELETE", body: { variantIds } });
     router.refresh();
+    if (managed) {
+      toast(`Excluded ${variantIds.length} listing${variantIds.length === 1 ? "" : "s"} from calculations`, { description: "It stays listed so you can confirm it again." });
+      return;
+    }
     toast(`Removed ${variantIds.length} listing${variantIds.length === 1 ? "" : "s"}`, {
       action: { label: "Undo", onClick: async () => { await api(`/api/groups/${group.id}/items`, { method: "POST", body: { variantIds } }); router.refresh(); } },
     });
@@ -115,6 +120,7 @@ export function ComparisonWorkspace({ detail, brands }: { detail: Detail; brands
           <div className="flex items-center gap-2">
             {simulated && <SimulatedBadge />}
             {group.marketplace && <MarketplaceTag code={group.marketplace} showName />}
+            {managed && <Badge tone="accent" size="xs" title="Membership follows your brand, category and unit. Aisle adds new listings automatically.">Kept in sync by Aisle</Badge>}
           </div>
           {editingName ? (
             <input
@@ -127,14 +133,18 @@ export function ComparisonWorkspace({ detail, brands }: { detail: Detail; brands
               aria-label="Comparison name"
             />
           ) : (
-            <h1 onDoubleClick={() => setEditingName(true)} className="mt-1 cursor-text text-2xl font-semibold tracking-tight md:text-3xl" title="Double-click to rename">{group.name}</h1>
+            <h1 onDoubleClick={() => !managed && setEditingName(true)} className={cn("mt-1 text-2xl font-semibold tracking-tight md:text-3xl", !managed && "cursor-text")} title={managed ? undefined : "Double-click to rename"}>{group.name}</h1>
           )}
           <p className="mt-1 text-md text-ink-2">{group.description ?? `${confirmedCount} confirmed listings compared ${NORMALIZATION_BASES[basis].long}.`}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select ariaLabel="Normalization basis" size="sm" value={basis} onValueChange={(v) => patchGroup({ basis: v }, "Basis updated — rankings recalculated")} options={Object.entries(NORMALIZATION_BASES).map(([k, v]) => ({ value: k, label: `Compare ${v.long}` }))} />
-          <Select ariaLabel="Reference brand" size="sm" value={group.referenceBrandId ?? "auto"} onValueChange={(v) => patchGroup({ referenceBrandId: v === "auto" ? null : v }, "Reference brand updated")} options={[{ value: "auto", label: "Reference: workspace default" }, ...brands.map((b) => ({ value: b.id, label: `Reference: ${b.name}` }))]} />
-          <AddListings groupId={group.id} existing={items.map((i) => i.variantId)} onPaste={() => importer.open(undefined, { groupId: group.id })} />
+          {!managed && (
+            <>
+              <Select ariaLabel="Normalization basis" size="sm" value={basis} onValueChange={(v) => patchGroup({ basis: v }, "Basis updated — rankings recalculated")} options={Object.entries(NORMALIZATION_BASES).map(([k, v]) => ({ value: k, label: `Compare ${v.long}` }))} />
+              <Select ariaLabel="Reference brand" size="sm" value={group.referenceBrandId ?? "auto"} onValueChange={(v) => patchGroup({ referenceBrandId: v === "auto" ? null : v }, "Reference brand updated")} options={[{ value: "auto", label: "Reference: your brand" }, ...brands.map((b) => ({ value: b.id, label: `Reference: ${b.name}` }))]} />
+              <AddListings groupId={group.id} existing={items.map((i) => i.variantId)} onPaste={() => importer.open(undefined, { groupId: group.id })} />
+            </>
+          )}
           <Menu align="end" trigger={<Button size="sm"><Download className="size-3.5" /> Export</Button>}>
             <MenuLabel>Competitive snapshot</MenuLabel>
             <MenuItem onSelect={() => exportAs("pdf")}>PDF report</MenuItem>
@@ -142,7 +152,7 @@ export function ComparisonWorkspace({ detail, brands }: { detail: Detail; brands
             <MenuItem onSelect={() => exportAs("csv")}>CSV</MenuItem>
             <MenuSeparator />
             <MenuItem icon={<Bell />} onSelect={() => router.push(`/alerts?new=1&group=${group.id}`)}>Create alert for this group…</MenuItem>
-            <MenuItem destructive onSelect={async () => { await patchGroup({ archived: true }); toast("Comparison archived", { action: { label: "Undo", onClick: () => patchGroup({ archived: false }) } }); router.push("/comparisons"); }}>Archive comparison</MenuItem>
+            {!managed && <MenuItem destructive onSelect={async () => { await patchGroup({ archived: true }); toast("Comparison archived", { action: { label: "Undo", onClick: () => patchGroup({ archived: false }) } }); router.push("/comparisons"); }}>Archive comparison</MenuItem>}
           </Menu>
         </div>
       </header>
