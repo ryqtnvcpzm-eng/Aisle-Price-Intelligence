@@ -34,7 +34,7 @@ export function HistoryExplorer({ options, groups, initial }: { options: Opt[]; 
       {!initial && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-ink-2">Start from</span>
-          <Select ariaLabel="Preset" size="sm" value={preset} onValueChange={setPreset} options={[...groups.map((g) => ({ value: g.id, label: g.name })), { value: "reference", label: "Reference brand listings" }]} />
+          <Select ariaLabel="Preset" size="sm" value={preset} onValueChange={setPreset} options={[...groups.map((g) => ({ value: g.id, label: g.name })), { value: "reference", label: "Your brand’s listings" }]} />
         </div>
       )}
       <div className="card p-5">

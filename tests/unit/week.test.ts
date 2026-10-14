@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, isWeekStart, lastCompletedWeek, localMidnight, weekLabel, weekStarting } from "@/lib/week";
+import { addDays, isWeekStart, lastCompletedWeek, localMidnight, shortDay, weekLabel, weekStarting } from "@/lib/week";
 
 describe("weeks in a workspace time zone", () => {
   it("picks the previous Monday–Sunday in Asia/Kolkata", () => {
@@ -27,6 +27,9 @@ describe("weeks in a workspace time zone", () => {
     expect(isWeekStart("2026-02-30")).toBe(false);
     expect(addDays("2026-12-28", 7)).toBe("2027-01-04");
     expect(weekLabel({ weekStart: "2026-10-05", weekEnd: "2026-10-11" })).toBe("5–11 Oct 2026");
-    expect(weekLabel({ weekStart: "2026-09-28", weekEnd: "2026-10-04" })).toBe("28 Sept – 4 Oct 2026");
+    expect(weekLabel({ weekStart: "2026-09-28", weekEnd: "2026-10-04" })).toBe("28 Sep – 4 Oct 2026");
+    expect(weekLabel({ weekStart: "2026-12-28", weekEnd: "2027-01-03" })).toBe("28 Dec 2026 – 3 Jan 2027");
+    expect(shortDay("2026-10-11T19:00:00Z", "Asia/Kolkata")).toBe("Mon 12 Oct"); // 00:30 IST on Monday
+    expect(shortDay("2026-10-11T19:00:00Z", "UTC")).toBe("Sun 11 Oct");
   });
 });

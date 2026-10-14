@@ -62,7 +62,12 @@ export function ChooseBrandDialog({ open, onOpenChange, current, onDone }: { ope
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title="Which brand is yours?" description="Aisle measures every competitor against this brand. You can change it at any time." size="md">
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-        {brands ? <BrandChoiceList brands={brands.brands} value={choice} onChange={setChoice} newName={newName} onNewName={setNewName} compact /> : <div className="space-y-1.5">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-[52px] rounded-[12px]" />)}</div>}
+        {brands ? (
+          // A long brand list scrolls on its own so the impact preview below stays in view.
+          <div className="-mx-1 max-h-[min(300px,40dvh)] overflow-y-auto px-1 py-1">
+            <BrandChoiceList brands={brands.brands} value={choice} onChange={setChoice} newName={newName} onNewName={setNewName} compact />
+          </div>
+        ) : <div className="space-y-1.5">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-[52px] rounded-[12px]" />)}</div>}
 
         <AutoHeight>
           <AnimatePresence mode="wait" initial={false}>

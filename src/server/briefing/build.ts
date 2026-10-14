@@ -191,7 +191,7 @@ export async function buildBriefing(workspaceId: string, week: Week): Promise<{ 
   if (referenceBrand && posWithBoth.length) {
     const moved = posWithBoth.map((p) => ({ p, delta: p.end!.premium! - p.start!.premium! })).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))[0]!;
     const cat = moved.p.name.split(" · ")[1] ?? moved.p.name;
-    sentences.push(Math.abs(moved.delta) < 0.005 ? `${referenceBrand.name}'s position held steady: ${formatPct(moved.p.end!.premium!, { signed: true })} vs the competitor median in ${cat}.` : `${referenceBrand.name} ended ${formatPct(moved.p.end!.premium!, { signed: true })} vs the competitor median in ${cat} (${moved.delta > 0 ? "up" : "down"} ${formatPct(Math.abs(moved.delta))} on the week).`);
+    sentences.push(Math.abs(moved.delta) < 0.005 ? `${referenceBrand.name}'s position held steady: ${formatPct(moved.p.end!.premium!, { signed: true })} vs the competitor median in ${cat}.` : `${referenceBrand.name} ended ${formatPct(moved.p.end!.premium!, { signed: true })} vs the competitor median in ${cat} (${moved.delta > 0 ? "up" : "down"} ${formatPoints(Math.abs(moved.delta))} on the week).`);
   } else if (!referenceBrand) sentences.push("Choose your brand to see your position against the market.");
   if (drops.length) {
     const top = drops[0]!;
@@ -212,6 +212,12 @@ export async function buildBriefing(workspaceId: string, week: Week): Promise<{ 
     confidence: { trackedListings, listingsWithObservations: observedListings.size, coverage: trackedListings ? observedListings.size / trackedListings : null, observations: inWeek.length, simulatedObservations, listingsWithFailures: failures, staleAtEnd, quantities, notes },
   };
   return { content, containsSimulated, referenceBrand };
+}
+
+/** A change in a percentage (premium) is expressed in percentage points, not percent. */
+export function formatPoints(delta: number) {
+  const v = Math.round(delta * 1000) / 10;
+  return `${Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1)} point${Math.abs(v) === 1 ? "" : "s"}`;
 }
 
 export function basisLabel(b: string) {

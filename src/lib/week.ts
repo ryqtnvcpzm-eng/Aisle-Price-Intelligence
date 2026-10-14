@@ -63,9 +63,26 @@ export function isWeekStart(v: string) {
   return dt.toISOString().slice(0, 10) === v && dt.getUTCDay() === 1;
 }
 
-/** "6–12 Oct 2026" style label. */
+// Fixed English names: Intl's month and weekday abbreviations differ between ICU versions
+// (e.g. "Sept" vs "Sep"), which would make server- and client-rendered text disagree.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+function ymd(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number) as [number, number, number];
+  return { y, m, d };
+}
+
+/** "5–11 Oct 2026" or "28 Sep – 4 Oct 2026". */
 export function weekLabel(w: Pick<Week, "weekStart" | "weekEnd">) {
-  const f = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-GB", { timeZone: "UTC", ...opts }).format(new Date(`${iso}T00:00:00Z`));
-  const sameMonth = w.weekStart.slice(0, 7) === w.weekEnd.slice(0, 7);
-  return sameMonth ? `${f(w.weekStart, { day: "numeric" })}–${f(w.weekEnd, { day: "numeric", month: "short", year: "numeric" })}` : `${f(w.weekStart, { day: "numeric", month: "short" })} – ${f(w.weekEnd, { day: "numeric", month: "short", year: "numeric" })}`;
+  const a = ymd(w.weekStart);
+  const b = ymd(w.weekEnd);
+  if (a.y === b.y && a.m === b.m) return `${a.d}–${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+  return `${a.d} ${MONTHS[a.m - 1]}${a.y !== b.y ? ` ${a.y}` : ""} – ${b.d} ${MONTHS[b.m - 1]} ${b.y}`;
+}
+
+/** "Sun 11 Oct": an instant's local day in a time zone, identical on server and client. */
+export function shortDay(at: string | Date, timeZone: string) {
+  const p = localParts(timeZone, new Date(at));
+  return `${WEEKDAYS[new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay()]} ${p.d} ${MONTHS[p.m - 1]}`;
 }

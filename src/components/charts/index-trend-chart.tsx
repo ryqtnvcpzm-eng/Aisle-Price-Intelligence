@@ -10,11 +10,11 @@ export interface IndexPoint {
 }
 
 /** Direct label at the series' last point (identity is never carried by color alone). */
-function endLabel(n: number, text: string, strong: boolean) {
+function endLabel(n: number, text: string, strong: boolean, dy = 0) {
   function EndLabel(props: { x?: number | string; y?: number | string; index?: number }) {
     if (props.index !== n - 1 || props.x === undefined || props.y === undefined) return null;
     return (
-      <text className="chart-end-label" x={Number(props.x) + 8} y={Number(props.y) + 4} fontSize={11} fontWeight={strong ? 600 : 400} fill={strong ? "var(--ink)" : "var(--ink-2)"}>
+      <text className="chart-end-label" x={Number(props.x) + 8} y={Number(props.y) + 4 + dy} fontSize={11} fontWeight={strong ? 600 : 400} fill={strong ? "var(--ink)" : "var(--ink-2)"}>
         {text.length > 18 ? `${text.slice(0, 17)}…` : text}
       </text>
     );
@@ -36,13 +36,17 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
   const lo = Math.floor(Math.min(...vals, 100) - 1);
   const hi = Math.ceil(Math.max(...vals, 100) + 1);
   const last = data.at(-1);
+  // When both series end close together, nudge their labels apart so they never overprint.
+  const gap = last?.reference != null && last?.competitors != null ? last.reference - last.competitors : null;
+  const close = gap !== null && Math.abs(gap) < (hi - lo) * 0.08;
+  const refDy = close ? (gap! >= 0 ? -7 : 7) : 0;
   return (
     <div style={{ height }} className="chart-reveal relative [overflow-x:clip]" role="img" aria-label={`Price index. ${referenceLabel} now ${last?.reference?.toFixed(1) ?? "n/a"}, competitors ${last?.competitors?.toFixed(1) ?? "n/a"} (100 = ${since}).`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: Math.min(132, Math.max(80, 14 + Math.min(referenceLabel.length, 18) * 6.6)), bottom: 0, left: -12 }}>
           <CartesianGrid vertical={false} strokeDasharray="0" />
           <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tickFormatter={fmtDate} tickLine={false} axisLine={false} minTickGap={48} tickMargin={8} />
-          <YAxis domain={[lo, hi]} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${v}`} tickCount={4} />
+          <YAxis domain={[lo, hi]} tickLine={false} axisLine={false} width={44} tickFormatter={(v) => `${Math.round(Number(v))}`} tickCount={4} allowDecimals={false} />
           <ReferenceLine y={100} stroke="var(--chart-axis)" strokeDasharray="3 3" />
           <Tooltip
             cursor={{ stroke: "var(--ink-4)", strokeWidth: 1 }}
@@ -60,8 +64,8 @@ export function IndexTrendChart({ data, height = 220, referenceLabel = "Your bra
               ) : null
             }
           />
-          <Line type="linear" dataKey="competitors" stroke="var(--series-2)" strokeWidth={2} dot={false} label={endLabel(data.length, "Competitors", false)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
-          <Line type="linear" dataKey="reference" stroke="var(--series-1)" strokeWidth={2.25} dot={false} label={endLabel(data.length, referenceLabel, true)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
+          <Line type="linear" dataKey="competitors" stroke="var(--series-2)" strokeWidth={2} dot={false} label={endLabel(data.length, "Competitors", false, -refDy)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
+          <Line type="linear" dataKey="reference" stroke="var(--series-1)" strokeWidth={2.25} dot={false} label={endLabel(data.length, referenceLabel, true, refDy)} activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--chart-surface)" }} isAnimationActive={false} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
 import { relativeTime } from "@/lib/freshness";
 import { formatMoney, formatPct } from "@/lib/money";
 import { NORMALIZATION_BASES, isNormalizationBasis } from "@/lib/quantity";
-import { weekLabel } from "@/lib/week";
+import { shortDay, weekLabel } from "@/lib/week";
 import { IndexTrendChart } from "../charts/index-trend-chart";
 import { spring, staggerDelay } from "../motion/tokens";
 import { Badge } from "../ui/badge";
@@ -125,7 +125,26 @@ export function BriefingView({ briefing, archive, canEdit, lastWeekStart }: { br
         ) : c.position.length === 0 ? (
           <p className="mt-4 text-sm text-ink-2">No comparisons yet — nothing tracked shares a category and unit with {ref.name}.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
+          <>
+          {/* Phones: one stacked row per comparison. */}
+          <ul className="mt-3 divide-y divide-[var(--hairline)] sm:hidden">
+            {c.position.map((p) => {
+              const delta = p.start?.premium != null && p.end?.premium != null ? p.end.premium - p.start.premium : null;
+              return (
+                <li key={p.groupId} className="py-2.5">
+                  <Link href={`/comparisons/${p.groupId}`} className="text-sm font-medium">{p.name.split(" · ").slice(1).join(" · ") || p.name}</Link>
+                  <div className="num mt-1 flex items-center gap-2 text-sm">
+                    <span className="text-ink-3">{premium(p.start)}</span>
+                    <span className="text-ink-4">→</span>
+                    <span className="font-semibold">{premium(p.end)}</span>
+                    <span className="ml-auto text-xs"><PointChange delta={delta} /></span>
+                  </div>
+                  <div className="text-2xs text-ink-3">Lowest at end: {p.end?.referenceIsCheapest ? "you" : (p.end?.cheapestBrand ?? "—")}</div>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-3 hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="text-left text-2xs uppercase tracking-wide text-ink-3">
@@ -147,15 +166,16 @@ export function BriefingView({ briefing, archive, canEdit, lastWeekStart }: { br
                       </td>
                       <td className="num py-2.5 text-right">{premium(p.start)}</td>
                       <td className="num py-2.5 text-right font-semibold">{premium(p.end)}</td>
-                      <td className="num py-2.5 text-right">{delta === null ? dash : Math.abs(delta) < 0.0005 ? <span className="text-ink-3">no change</span> : <span className={delta > 0 ? "text-up" : "text-down"}>{delta > 0 ? "▲" : "▼"} {formatPct(Math.abs(delta))}</span>}</td>
+                      <td className="num py-2.5 text-right"><PointChange delta={delta} /></td>
                       <td className="py-2.5 pl-4 text-xs text-ink-2">{p.end?.referenceIsCheapest ? <Badge tone="accent" size="xs">You</Badge> : (p.end?.cheapestBrand ?? dash)}{p.end?.referenceUnit != null && isNormalizationBasis(p.basis) && <span className="num ml-2 text-ink-3">yours {formatMoney(p.end.referenceUnit, p.currency ?? "INR", undefined, { trimZeros: false })}{NORMALIZATION_BASES[p.basis].label}</span>}</td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-            <p className="mt-2 text-2xs text-ink-3">Premium = (your best unit price − competitor median) ÷ competitor median. ▲ means pricier relative to the market.</p>
           </div>
+          <p className="mt-2 text-2xs text-ink-3">Premium = (your best unit price − competitor median) ÷ competitor median. Change is in percentage points; ▲ means pricier relative to the market.</p>
+          </>
         )}
       </motion.section>
 
@@ -191,7 +211,7 @@ export function BriefingView({ briefing, archive, canEdit, lastWeekStart }: { br
                 {c.competitive.events.slice(0, 8).map((e) => (
                   <li key={e.id}>
                     <Link href={`/alerts?event=${e.id}`} className="-mx-2 flex items-start gap-3 rounded-[9px] px-2 py-2 hover:bg-[var(--hairline)]">
-                      <span className="num w-[52px] shrink-0 pt-0.5 text-2xs text-ink-3">{new Date(e.firedAt).toLocaleDateString(undefined, { weekday: "short", day: "numeric", timeZone: briefing.timeZone })}</span>
+                      <span className="num w-[76px] shrink-0 pt-0.5 text-2xs text-ink-3">{shortDay(e.firedAt, briefing.timeZone)}</span>
                       <span className="min-w-0 flex-1 text-sm">{e.headline}</span>
                       {e.isSimulated && <SimulatedBadge compact />}
                     </Link>
@@ -218,7 +238,7 @@ export function BriefingView({ briefing, archive, canEdit, lastWeekStart }: { br
                   </span>
                   <span className="num hidden text-xs text-ink-3 sm:inline">{formatMoney(d.from, d.currency)} → {formatMoney(d.to, d.currency)}</span>
                   <Delta ratio={d.ratio} />
-                  <span className="num hidden w-[64px] text-right text-2xs text-ink-3 md:inline">{new Date(d.at).toLocaleDateString(undefined, { weekday: "short", day: "numeric", timeZone: briefing.timeZone })}</span>
+                  <span className="num hidden w-[84px] text-right text-2xs text-ink-3 md:inline">{shortDay(d.at, briefing.timeZone)}</span>
                 </Link>
               </li>
             ))}
@@ -252,6 +272,18 @@ export function BriefingView({ briefing, archive, canEdit, lastWeekStart }: { br
         </motion.section>
       </div>
     </div>
+  );
+}
+
+/** A change in premium, in percentage points. */
+function PointChange({ delta }: { delta: number | null }) {
+  if (delta === null) return dash;
+  if (Math.abs(delta) < 0.0005) return <span className="text-ink-3">no change</span>;
+  const v = Math.round(Math.abs(delta) * 1000) / 10;
+  return (
+    <span className={delta > 0 ? "text-up" : "text-down"}>
+      {delta > 0 ? "▲" : "▼"} {Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1)} pts
+    </span>
   );
 }
 

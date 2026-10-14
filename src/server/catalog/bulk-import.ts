@@ -31,6 +31,7 @@ export const MAX_ITEMS_PER_JOB = 20_000;
 const LEASE_MS = 2 * 60_000;
 const STUCK_MS = 5 * 60_000;
 const MAX_ATTEMPTS = 3;
+const NOT_RETRYABLE = ["duplicate", "empty", "not_a_url", "unsupported_host", "no_asin", "invalid_asin", "unsupported_marketplace", "not_found", "already_tracked"];
 const RETRYABLE = new Set(["rate_limited", "timeout", "upstream", "quota_exhausted", "provider_error"]);
 
 export const createJobSchema = z.object({
@@ -79,15 +80,22 @@ export interface JobCounts {
   failed: number;
   cancelled: number;
   variantsAdded: number;
+  /** Failed links worth retrying (provider or save errors, not invalid or missing listings). */
+  retryable: number;
 }
 
 export async function jobCounts(jobId: string): Promise<JobCounts> {
   const rows = await db.select({ status: importJobItems.status, n: sql<number>`count(*)::int`, v: sql<number>`coalesce(sum(${importJobItems.newVariants}), 0)::int` }).from(importJobItems).where(eq(importJobItems.jobId, jobId)).groupBy(importJobItems.status);
-  const c: JobCounts = { pending: 0, processing: 0, succeeded: 0, skipped: 0, failed: 0, cancelled: 0, variantsAdded: 0 };
+  const c: JobCounts = { pending: 0, processing: 0, succeeded: 0, skipped: 0, failed: 0, cancelled: 0, variantsAdded: 0, retryable: 0 };
   for (const r of rows) {
     c[r.status] = r.n;
     c.variantsAdded += r.v;
   }
+  const [{ n } = { n: 0 }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(importJobItems)
+    .where(and(eq(importJobItems.jobId, jobId), inArray(importJobItems.status, ["failed", "cancelled"]), or(sql`${importJobItems.errorCode} is null`, sql`${importJobItems.errorCode} not in ${NOT_RETRYABLE}`)));
+  c.retryable = n;
   return c;
 }
 
@@ -278,8 +286,6 @@ async function processItems(ctx: AppContext, job: ImportJob, items: Item[]) {
 }
 
 export const jobActionSchema = z.object({ action: z.enum(["pause", "resume", "cancel", "retry_failed"]) });
-
-const NOT_RETRYABLE = ["duplicate", "empty", "not_a_url", "unsupported_host", "no_asin", "invalid_asin", "unsupported_marketplace", "not_found", "already_tracked"];
 
 export async function jobAction(ctx: AppContext, jobId: string, action: z.infer<typeof jobActionSchema>["action"]) {
   const { job } = await getJob(ctx.workspace.id, jobId);

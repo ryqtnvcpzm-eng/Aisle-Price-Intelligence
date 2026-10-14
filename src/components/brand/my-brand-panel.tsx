@@ -93,8 +93,8 @@ export function MyBrandPanel({ data }: { data: MyBrandData }) {
           <button onClick={() => setShowUnmatched((v) => !v)} aria-expanded={showUnmatched} className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm">
             <span className="font-medium">Not yet matched</span>
             <span className="num text-xs text-ink-3">{data.unmatched.length}</span>
-            <span className="ml-auto text-xs text-ink-3">Listings Aisle can’t compare fairly yet</span>
-            <motion.span animate={{ rotate: showUnmatched ? 180 : 0 }} transition={spring.snappy}>
+            <span className="ml-auto hidden text-xs text-ink-3 sm:inline">Listings Aisle can’t compare fairly yet</span>
+            <motion.span animate={{ rotate: showUnmatched ? 180 : 0 }} transition={spring.snappy} className="ml-auto sm:ml-0">
               <ChevronDown className="size-4 text-ink-3" />
             </motion.span>
           </button>

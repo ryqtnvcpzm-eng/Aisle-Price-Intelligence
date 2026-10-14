@@ -442,7 +442,7 @@ export function ImportDialog({ open, onOpenChange, prefill, groupId: initialGrou
                     const parsedBulk = parseManyInputs(bulkInputs.join("\n"), defaultMp);
                     const bad = parsedBulk.filter((p) => p.kind === "error").length;
                     const dupes = parsedBulk.filter((p) => "duplicateOf" in p && p.duplicateOf).length;
-                    return bad || dupes ? <p className="mt-2 text-xs text-ink-3">{[bad ? `${bad} don’t look like Amazon links and will be reported as failed` : null, dupes ? `${dupes} duplicate${dupes === 1 ? "" : "s"} will be skipped` : null].filter(Boolean).join(" · ")}.</p> : null;
+                    return bad || dupes ? <p className="mt-2 text-xs text-ink-3">{[bad ? `${bad} ${bad === 1 ? "doesn’t look like an Amazon link" : "don’t look like Amazon links"} and will be reported as failed` : null, dupes ? `${dupes} duplicate${dupes === 1 ? "" : "s"} will be skipped` : null].filter(Boolean).join(" · ")}.</p> : null;
                   })()}
                 </div>
                 <div className="space-y-1.5">

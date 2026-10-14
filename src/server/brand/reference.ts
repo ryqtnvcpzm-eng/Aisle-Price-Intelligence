@@ -243,9 +243,12 @@ export async function reconcileIfConfigured(actor: Actor) {
 export async function referenceOverview(workspaceId: string) {
   const ref = await getReferenceBrand(workspaceId);
   const groups = await db
-    .select({ id: comparisonGroups.id, name: comparisonGroups.name, basis: comparisonGroups.basis, marketplace: comparisonGroups.marketplace, cohort: comparisonGroups.managedCohort, archivedAt: comparisonGroups.archivedAt, items: sql<number>`(select count(*)::int from comparison_items ci where ci.group_id = ${comparisonGroups.id})` })
+    .select({ id: comparisonGroups.id, name: comparisonGroups.name, basis: comparisonGroups.basis, marketplace: comparisonGroups.marketplace, cohort: comparisonGroups.managedCohort, items: sql<number>`count(${comparisonItems.id})::int` })
     .from(comparisonGroups)
-    .where(and(eq(comparisonGroups.workspaceId, workspaceId), eq(comparisonGroups.managedBy, REFERENCE_MARKET), isNull(comparisonGroups.archivedAt)));
+    .leftJoin(comparisonItems, eq(comparisonItems.groupId, comparisonGroups.id))
+    .where(and(eq(comparisonGroups.workspaceId, workspaceId), eq(comparisonGroups.managedBy, REFERENCE_MARKET), isNull(comparisonGroups.archivedAt)))
+    .groupBy(comparisonGroups.id)
+    .orderBy(comparisonGroups.name);
   const unmatched = ref ? buildCohorts(await cohortRows(workspaceId, db), ref.id).unmatched : [];
   return { brand: ref ? { id: ref.id, name: ref.name } : null, groups, unmatched };
 }

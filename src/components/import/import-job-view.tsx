@@ -168,9 +168,9 @@ export function ImportJobView({ initial }: { initial: Snapshot }) {
                 <Play className="size-3.5" /> Resume
               </Button>
             )}
-            {!active && counts.failed > 0 && (
+            {!active && counts.retryable > 0 && (
               <Button size="sm" loading={acting === "retry_failed"} onClick={() => act("retry_failed")}>
-                <RotateCw className="size-3.5" /> Retry failed
+                <RotateCw className="size-3.5" /> Retry {counts.retryable} failed
               </Button>
             )}
             <a href={`/api/import/jobs/${id}/export`} download className="inline-flex h-7 items-center gap-1.5 rounded-[8px] px-2.5 text-sm font-medium text-ink shadow-[var(--shadow-xs),inset_0_0_0_0.5px_var(--line-strong)] transition-colors hover:bg-surface-2">

@@ -77,6 +77,7 @@ describe("reference brand", () => {
     expect(d.items.some((i) => i.role === "competitor")).toBe(true);
     // Listings with no Northfield counterpart are reported, not silently dropped.
     const overview = await referenceOverview(ctx.workspace.id);
+    expect(overview.groups.find((g) => g.id === protein.id)!.items).toBe(d.items.length);
     expect(overview.unmatched.length).toBeGreaterThan(0);
     expect(overview.unmatched.every((u) => ["no_quantity", "no_reference_in_cohort", "no_competitor_in_cohort"].includes(u.reason))).toBe(true);
   });
